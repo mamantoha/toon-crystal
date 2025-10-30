@@ -1,0 +1,14 @@
+name: toon
+version: 0.1.0
+authors:
+  - Anton Maminov <anton.maminov@gmail.com>
+description: |
+  Token-Oriented Object Notation - a token-efficient JSON alternative for LLM prompts.
+  TOON is a compact, human-readable format designed for passing structured data to Large Language Models with significantly reduced token usage.
+license: MIT
+repository: https://github.com/mamantoha/toon-crystal
+
+development_dependencies:
+  ameba:
+    github: crystal-ameba/ameba
+    branch: master
