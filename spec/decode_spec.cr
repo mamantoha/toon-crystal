@@ -637,4 +637,18 @@ describe Toon do
       end
     end
   end
+
+  describe "DecodeError type" do
+    it "raises Toon::DecodeError on invalid escape sequence" do
+      expect_raises(Toon::DecodeError) { Toon.decode("\"a\\x\"") }
+    end
+
+    it "raises Toon::DecodeError on missing colon after key" do
+      expect_raises(Toon::DecodeError) { Toon.decode("a:\n  user") }
+    end
+
+    it "raises Toon::DecodeError on array length mismatch" do
+      expect_raises(Toon::DecodeError) { Toon.decode("tags[2]: a,b,c") }
+    end
+  end
 end
