@@ -53,7 +53,7 @@ describe Toon do
     it "handles special numeric values" do
       Toon.encode(-0.0).should eq("0")
       Toon.encode(1e6).should eq("1000000.0")
-      Toon.encode(1e-6).should eq("1.0e-06")
+      Toon.encode(1e-6).should eq("1.0e-6")
     end
 
     it "encodes booleans" do

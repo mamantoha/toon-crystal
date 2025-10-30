@@ -52,15 +52,7 @@ module Toon
     end
 
     private def format_number(n : Float)
-      s = n.to_s
-
-      # Match Ruby's scientific notation format (e.g., "1.0e-06" instead of "1.0e-6")
-      if match = s.match(/e([+-])(\d)$/)
-        # Pad single-digit exponent with zero
-        "#{match.pre_match}e#{match[1]}0#{match[2]}"
-      else
-        s
-      end
+      n.to_s
     end
 
     def encode_string_literal(value : String, delimiter : String = COMMA.to_s)
