@@ -1,7 +1,7 @@
-require "./constants"
-require "./writer"
+require "../constants"
 require "./normalizer"
 require "./primitives"
+require "./writer"
 
 module Toon
   module Encoders

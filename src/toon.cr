@@ -1,9 +1,9 @@
 require "./toon/version"
 require "./toon/constants"
-require "./toon/writer"
-require "./toon/normalizer"
-require "./toon/primitives"
-require "./toon/encoders"
+require "./toon/encode/encoders"
+require "./toon/encode/normalizer"
+require "./toon/encode/primitives"
+require "./toon/encode/writer"
 
 module Toon
   extend self

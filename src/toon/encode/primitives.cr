@@ -1,4 +1,4 @@
-require "./constants"
+require "../constants"
 
 module Toon
   module Primitives

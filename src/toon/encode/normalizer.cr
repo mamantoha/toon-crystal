@@ -1,4 +1,4 @@
-require "./constants"
+require "../constants"
 require "time"
 
 module Toon
