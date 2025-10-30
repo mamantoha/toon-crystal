@@ -1,4 +1,5 @@
 require "../constants"
+require "./error"
 
 module Toon
   # Lightweight line representation for decoding
@@ -103,11 +104,11 @@ module Toon
 
         if strict
           if leading.includes?('\t')
-            raise ArgumentError.new("indentation error: tab character not allowed")
+            raise DecodeError.new("indentation error: tab character not allowed")
           end
 
           if leading.size % indent != 0
-            raise ArgumentError.new("indentation error: indentation must be an exact multiple of #{indent}")
+            raise DecodeError.new("indentation error: indentation must be an exact multiple of #{indent}")
           end
         end
 
@@ -123,7 +124,7 @@ module Toon
 
     private def decode_value_from_lines(cursor : LineCursor, delimiter : String, strict : Bool) : JsonValue
       first = cursor.peek
-      raise ArgumentError.new("No content to decode") unless first
+      raise DecodeError.new("No content to decode") unless first
 
       if parsed = parse_array_header_line(first.content)
         header, inline_values = parsed
@@ -282,7 +283,7 @@ module Toon
 
         blanks.each do |ln|
           if ln >= start_line && ln <= end_line
-            raise ArgumentError.new("blank line inside list array")
+            raise DecodeError.new("blank line inside list array")
           end
         end
       end
@@ -291,7 +292,7 @@ module Toon
         line = cursor.peek
 
         if line && line.depth == item_depth && line.content.starts_with?(LIST_ITEM_PREFIX)
-          raise ArgumentError.new("Unexpected extra list array items")
+          raise DecodeError.new("Unexpected extra list array items")
         end
       end
 
@@ -333,7 +334,7 @@ module Toon
         blanks = cursor.blank_lines
         blanks.each do |ln|
           if ln >= start_line && ln <= end_line
-            raise ArgumentError.new("blank line inside tabular array")
+            raise DecodeError.new("blank line inside tabular array")
           end
         end
       end
@@ -343,7 +344,7 @@ module Toon
         if line && line.depth == row_depth
           # Only raise if it's truly another row (not a following key/value field)
           unless key_value_line?(line.content) || line.content.starts_with?(LIST_ITEM_PREFIX)
-            raise ArgumentError.new("Unexpected extra tabular rows")
+            raise DecodeError.new("Unexpected extra tabular rows")
           end
         end
       end
@@ -354,7 +355,7 @@ module Toon
     private def decode_list_item(cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool) : JsonValue
       line = cursor.next
 
-      raise ArgumentError.new("Expected list item") unless line
+      raise DecodeError.new("Expected list item") unless line
 
       after_hyphen = line.content.byte_slice(LIST_ITEM_PREFIX.size)
 
@@ -465,7 +466,7 @@ module Toon
         i += 1
       end
 
-      raise ArgumentError.new("Invalid key-value line: #{content}")
+      raise DecodeError.new("Invalid key-value line: #{content}")
     end
 
     private def parse_key_token_value(raw : String) : String
@@ -512,7 +513,7 @@ module Toon
         return s
       end
 
-      raise ArgumentError.new("Unterminated string: missing closing quote") unless s.ends_with?(DOUBLE_QUOTE)
+      raise DecodeError.new("Unterminated string: missing closing quote") unless s.ends_with?(DOUBLE_QUOTE)
 
       inner = s[1, s.size - 2]
 
@@ -522,7 +523,7 @@ module Toon
         while i < inner.size
           ch = inner[i]
           if ch == '\\'
-            raise ArgumentError.new("Unterminated escape sequence") if i + 1 >= inner.size
+            raise DecodeError.new("Unterminated escape sequence") if i + 1 >= inner.size
             nxt = inner[i + 1]
             case nxt
             when 'n'  then io << '\n'
@@ -531,7 +532,7 @@ module Toon
             when '"'  then io << '"'
             when '\\' then io << '\\'
             else
-              raise ArgumentError.new("Invalid escape sequence: \\#{nxt}")
+              raise DecodeError.new("Invalid escape sequence: \\#{nxt}")
             end
             i += 2
           else
@@ -674,7 +675,7 @@ module Toon
 
     private def assert_expected_count(actual : Int32, expected : Int32, what : String)
       if actual != expected
-        raise ArgumentError.new("Expected #{expected} #{what}, got #{actual}")
+        raise DecodeError.new("Expected #{expected} #{what}, got #{actual}")
       end
     end
   end
