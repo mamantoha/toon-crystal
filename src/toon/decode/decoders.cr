@@ -75,7 +75,7 @@ module Toon
     end
 
     # decode TOON string into Crystal JSON-like values
-    def decode_value(input : String, indent : Int32 = 2, strict : Bool = false) : JsonValue
+    def decode_value(input : String, indent : Int32 = 2, strict : Bool = true) : JsonValue
       lines, blanks = tokenize_lines(input, indent, strict)
       cursor = LineCursor.new(lines, blanks)
       decode_value_from_lines(cursor, delimiter: DEFAULT_DELIMITER.to_s, strict: strict)

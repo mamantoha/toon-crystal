@@ -52,7 +52,18 @@ module Toon
     end
 
     private def format_number(n : Float)
-      n.to_s
+      # Spec requires no scientific notation (e.g., 1e-6 → 0.000001)
+      s = n.to_s
+
+      # If string contains 'e' or 'E', convert to decimal form
+      if s.includes?('e') || s.includes?('E')
+        # Use fixed-point format with sufficient precision
+        # Format with up to 20 decimal places, then remove trailing zeros
+        formatted = sprintf("%.20f", n).gsub(/\.?0+$/, "")
+        return formatted
+      end
+
+      s
     end
 
     def encode_string_literal(value : String, delimiter : String = COMMA.to_s)
