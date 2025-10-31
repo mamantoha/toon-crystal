@@ -55,7 +55,9 @@ describe Toon do
   describe "objects (simple)" do
     it "parses objects with primitive values" do
       toon = "id: 123\nname: Ada\nactive: true"
-      Toon.decode(toon).should eq({"id" => 123_i64, "name" => "Ada", "active" => true})
+      result = Toon.decode(toon)
+      result.should eq({"id" => 123_i64, "name" => "Ada", "active" => true})
+      result.as(Hash)["id"].should eq(123_i64)
     end
 
     it "parses null values in objects" do
@@ -149,12 +151,20 @@ describe Toon do
   describe "arrays of objects (tabular and list items)" do
     it "parses tabular arrays of uniform objects" do
       toon = "items[2]{sku,qty,price}:\n  A1,2,9.99\n  B2,1,14.5"
-      Toon.decode(toon).should eq({
+
+      result = Toon.decode(toon)
+
+      result.should eq({
         "items" => [
           {"sku" => "A1", "qty" => 2_i64, "price" => 9.99},
           {"sku" => "B2", "qty" => 1_i64, "price" => 14.5},
         ],
       })
+
+      item = result.as(Hash)["items"].as(Array).first.as(Hash)
+      item["sku"].should eq("A1")
+      item["qty"].should eq(2_i64)
+      item["price"].should eq(9.99)
     end
 
     it "parses nulls and quoted values in tabular rows" do
