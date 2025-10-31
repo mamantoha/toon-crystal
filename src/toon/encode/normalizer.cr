@@ -6,7 +6,6 @@ module Toon
     extend self
 
     # Normalization (unknown → JSON-compatible value)
-    # ameba:disable Metrics/CyclomaticComplexity
     def normalize_value(value)
       case value
       when Nil

@@ -87,7 +87,6 @@ module Toon
         .gsub("\t", "\\t")
     end
 
-    # ameba:disable Metrics/CyclomaticComplexity
     def safe_unquoted?(value : String, delimiter : String = COMMA.to_s)
       return false if value.empty?
       return false if padded_with_whitespace?(value)
