@@ -1,7 +1,5 @@
 Metrics/CyclomaticComplexity:
-  Excluded:
-  - src/toon/decode/decoders.cr
+  Enabled: false
 
 Naming/BlockParameterName:
-  Excluded:
-  - src/toon/decode/decoders.cr
+  Enabled: false
