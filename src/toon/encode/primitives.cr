@@ -55,7 +55,7 @@ module Toon
       # Spec requires no scientific notation (e.g., 1e-6 → 0.000001)
       s = n.to_s
 
-      if integer_like?(n)
+      if integer_like?(n) && n <= Int64::MAX
         return n.to_i.to_s
       end
 
