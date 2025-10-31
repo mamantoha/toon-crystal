@@ -13,20 +13,12 @@ module Toon
       value.to_s
     end
 
-    def encode_primitive(value : Int32, delimiter : String | Char = COMMA)
+    def encode_primitive(value : Int, delimiter : String | Char = COMMA)
       value.to_s
     end
 
-    def encode_primitive(value : Float32, delimiter : String | Char = COMMA)
+    def encode_primitive(value : Float, delimiter : String | Char = COMMA)
       format_number(value)
-    end
-
-    def encode_primitive(value : Float64, delimiter : String | Char = COMMA)
-      format_number(value)
-    end
-
-    def encode_primitive(value : Number, delimiter : String | Char = COMMA)
-      value.to_s
     end
 
     def encode_primitive(value : String, delimiter : String | Char = COMMA)
@@ -44,7 +36,7 @@ module Toon
         encode_string_literal(value, delimiter.to_s)
       when Float32, Float64
         format_number(value)
-      when Int32, Int64, Number
+      when Int32, Int64
         value.to_s
       else
         value.to_s

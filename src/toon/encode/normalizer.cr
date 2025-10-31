@@ -17,13 +17,11 @@ module Toon
       when Int32, Int64
         value
       when Float32, Float64
-        v = value.to_f
-
         # -0.0 becomes 0
-        return 0 if v == 0.0 && (1.0 / v) < 0
+        return 0 if value == 0.0 && (1.0 / value) < 0
 
         # NaN and Infinity become nil
-        return nil unless v.finite?
+        return nil unless value.finite?
 
         value
       when Symbol
