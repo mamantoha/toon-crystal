@@ -1,5 +1,7 @@
 # TOON for Crystal
 
+[![Crystal CI](https://github.com/mamantoha/toon-crystal/actions/workflows/crystal.yml/badge.svg)](https://github.com/mamantoha/toon-crystal/actions/workflows/crystal.yml)
+
 **Token-Oriented Object Notation** is a compact, human-readable format designed for passing structured data to Large Language Models with significantly reduced token usage.
 
 This is a Crystal port of the [TOON library](https://github.com/johannschopplich/toon) originally written in TypeScript, and ported from Ruby <https://github.com/andrepcg/toon-ruby>.
