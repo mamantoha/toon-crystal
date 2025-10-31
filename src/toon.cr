@@ -4,6 +4,7 @@ require "./toon/encode/encoders"
 require "./toon/encode/normalizer"
 require "./toon/encode/primitives"
 require "./toon/encode/writer"
+require "./toon/decode/decoders"
 
 module Toon
   extend self
@@ -19,6 +20,16 @@ module Toon
     normalized_value = Normalizer.normalize_value(input)
     options = resolve_options(indent: indent, delimiter: delimiter, length_marker: length_marker)
     Encoders.encode_value(normalized_value, options)
+  end
+
+  # Decode TOON-formatted string to a Crystal value
+  #
+  # @param input : TOON-formatted string
+  # @param indent : Number of spaces per indentation level (default: 2)
+  # @param strict : Whether to enable strict validations (currently minimal)
+  # @return : Decoded Crystal value
+  def decode(input : String, indent : Int32 = 2, strict : Bool = true)
+    Decoders.decode_value(input, indent, strict)
   end
 
   private def resolve_options(indent : Int32, delimiter : String | Char, length_marker : String | Bool)

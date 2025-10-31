@@ -1,0 +1,7 @@
+Metrics/CyclomaticComplexity:
+  Excluded:
+  - src/toon/decode/decoders.cr
+
+Naming/BlockParameterName:
+  Excluded:
+  - src/toon/decode/decoders.cr

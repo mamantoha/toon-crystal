@@ -90,6 +90,22 @@ user:
   preferences[0]:
 ```
 
+You can also decode TOON back to Crystal values:
+
+```crystal
+toon = """
+user:
+  id: 123
+  name: Ada
+  tags[2]: reading,gaming
+  active: true
+  preferences[0]:
+"""
+
+value = Toon.decode(toon)
+# => {"user" => {"id" => 123, "name" => "Ada", "tags" => ["reading", "gaming"], "active" => true, "preferences" => []}}
+```
+
 ## Canonical Formatting Rules
 
 TOON formatting is deterministic and minimal:
@@ -216,6 +232,33 @@ Toon.encode({ "items" => items }, delimiter: '\t')
 # Length marker
 Toon.encode({ "tags" => ["a", "b", "c"] }, length_marker: '#')
 # => "tags[#3]: a,b,c"
+```
+
+### `Toon.decode(input, *, indent = 2, strict = true)`
+
+Parses a TOON-formatted string into native Crystal values.
+
+**Parameters:**
+
+- `input` – TOON-formatted string
+- `indent` – Number of spaces per indentation level (default: `2`)
+- `strict` – Enable validations for indentation, tabs, blank lines, and extra rows/items (default: `true`)
+
+**Returns:**
+
+A Crystal value (`Nil | Bool | Int64 | Float64 | String | Array | Hash(String, _)`).
+
+**Examples:**
+
+```crystal
+Toon.decode("tags[3]: a,b,c")
+# => {"tags" => ["a", "b", "c"]}
+
+Toon.decode("[2]{id}:\n  1\n  2")
+# => [{"id" => 1}, {"id" => 2}]
+
+Toon.decode("items[2]:\n  - id: 1\n    name: First\n  - id: 2\n    name: Second")
+# => {"items" => [{"id" => 1, "name" => "First"}, {"id" => 2, "name" => "Second"}]}
 ```
 
 ## Development
