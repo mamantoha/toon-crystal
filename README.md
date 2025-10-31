@@ -4,7 +4,7 @@
 
 **Token-Oriented Object Notation** is a compact, human-readable format designed for passing structured data to Large Language Models with significantly reduced token usage.
 
-This is a Crystal port of the [TOON library](https://github.com/johannschopplich/toon) originally written in TypeScript, and ported from Ruby <https://github.com/andrepcg/toon-ruby>.
+This is a Crystal port of the [TOON library](https://github.com/johannschopplich/toon) originally written in TypeScript, and ported from Ruby [library](https://github.com/andrepcg/toon-ruby).
 
 TOON excels at **uniform complex objects** – multiple fields per row, same structure across items. It borrows YAML's indentation-based structure for nested objects and CSV's tabular format for uniform data rows, then optimizes both for token efficiency in LLM contexts.
 
@@ -287,4 +287,4 @@ The project is available as open source under the terms of the [MIT License](LIC
 
 ## Credits
 
-This is a Crystal port of the original [TOON library](https://github.com/johannschopplich/toon) by [Johann Schopplich](https://github.com/johannschopplich) and ported from Ruby library <https://github.com/andrepcg/toon-ruby>.
+This is a Crystal port of the original [TOON library](https://github.com/johannschopplich/toon) by [Johann Schopplich](https://github.com/johannschopplich).
