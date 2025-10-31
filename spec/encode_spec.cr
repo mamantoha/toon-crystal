@@ -51,9 +51,11 @@ describe Toon do
     end
 
     it "handles special numeric values" do
-      Toon.encode(-0.0).should eq("0")
-      Toon.encode(1e6).should eq("1000000.0")
-      Toon.encode(1e-6).should eq("1.0e-6")
+      Toon.encode(-0).should eq("0")
+      Toon.encode(1e6).should eq("1000000")
+      Toon.encode(1e-6).should eq("0.000001")
+      Toon.encode(1e20).should eq("100000000000000000000")
+      Toon.encode(Int64::MAX).should eq("9223372036854775807")
     end
 
     it "encodes booleans" do

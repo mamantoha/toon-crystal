@@ -13,20 +13,12 @@ module Toon
       value.to_s
     end
 
-    def encode_primitive(value : Int32, delimiter : String | Char = COMMA)
+    def encode_primitive(value : Int, delimiter : String | Char = COMMA)
       value.to_s
     end
 
-    def encode_primitive(value : Float32, delimiter : String | Char = COMMA)
+    def encode_primitive(value : Float, delimiter : String | Char = COMMA)
       format_number(value)
-    end
-
-    def encode_primitive(value : Float64, delimiter : String | Char = COMMA)
-      format_number(value)
-    end
-
-    def encode_primitive(value : Number, delimiter : String | Char = COMMA)
-      value.to_s
     end
 
     def encode_primitive(value : String, delimiter : String | Char = COMMA)
@@ -44,7 +36,7 @@ module Toon
         encode_string_literal(value, delimiter.to_s)
       when Float32, Float64
         format_number(value)
-      when Int32, Int64, Number
+      when Int32, Int64
         value.to_s
       else
         value.to_s
@@ -52,7 +44,22 @@ module Toon
     end
 
     private def format_number(n : Float)
-      n.to_s
+      # Spec requires no scientific notation (e.g., 1e-6 → 0.000001)
+      s = n.to_s
+
+      if integer_like?(n) && n <= Int64::MAX
+        return n.to_i.to_s
+      end
+
+      # If string contains 'e' or 'E', convert to decimal form
+      if s.includes?('e') || s.includes?('E')
+        # Use fixed-point format with sufficient precision
+        # Format with up to 20 decimal places, then remove trailing zeros
+        formatted = sprintf("%.20f", n).gsub(/\.?0+$/, "")
+        return formatted
+      end
+
+      s
     end
 
     def encode_string_literal(value : String, delimiter : String = COMMA.to_s)
@@ -72,7 +79,6 @@ module Toon
         .gsub("\t", "\\t")
     end
 
-    # ameba:disable Metrics/CyclomaticComplexity
     def safe_unquoted?(value : String, delimiter : String = COMMA.to_s)
       return false if value.empty?
       return false if padded_with_whitespace?(value)
@@ -91,6 +97,10 @@ module Toon
     def numeric_like?(value : String)
       # Match numbers like: 42, -3.14, 1e-6, 05, etc.
       value =~ /^-?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i || value =~ /^0\d+$/
+    end
+
+    def integer_like?(value : Float)
+      value % 1 == 0
     end
 
     def padded_with_whitespace?(value : String)

@@ -199,7 +199,6 @@ module Toon
       end
     end
 
-    # ameba:disable Metrics/CyclomaticComplexity
     def encode_object_as_list_item(obj : Hash, writer : LineWriter, depth : Int32, options)
       keys = obj.keys
 
