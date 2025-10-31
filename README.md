@@ -93,14 +93,14 @@ user:
 You can also decode TOON back to Crystal values:
 
 ```crystal
-toon = """
-user:
-  id: 123
-  name: Ada
-  tags[2]: reading,gaming
-  active: true
-  preferences[0]:
-"""
+toon = <<-TOON
+  user:
+    id: 123
+    name: Ada
+    tags[2]: reading,gaming
+    active: true
+    preferences[0]:
+  TOON
 
 value = Toon.decode(toon)
 # => {"user" => {"id" => 123, "name" => "Ada", "tags" => ["reading", "gaming"], "active" => true, "preferences" => []}}
