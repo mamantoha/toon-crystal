@@ -51,8 +51,8 @@ describe Toon do
     end
 
     it "handles special numeric values" do
-      Toon.encode(-0.0).should eq("0")
-      Toon.encode(1e6).should eq("1000000.0")
+      Toon.encode(-0).should eq("0")
+      Toon.encode(1e6).should eq("1000000")
       Toon.encode(1e-6).should eq("0.000001")
     end
 

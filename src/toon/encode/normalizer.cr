@@ -15,10 +15,8 @@ module Toon
         value
       when Bool
         value
-      when Int32
+      when Int32, Int64
         value
-      when Int64
-        value.to_i32
       when Float32, Float64
         v = value.to_f
 

@@ -55,6 +55,10 @@ module Toon
       # Spec requires no scientific notation (e.g., 1e-6 → 0.000001)
       s = n.to_s
 
+      if integer_like?(n)
+        return n.to_i.to_s
+      end
+
       # If string contains 'e' or 'E', convert to decimal form
       if s.includes?('e') || s.includes?('E')
         # Use fixed-point format with sufficient precision
@@ -102,6 +106,10 @@ module Toon
     def numeric_like?(value : String)
       # Match numbers like: 42, -3.14, 1e-6, 05, etc.
       value =~ /^-?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i || value =~ /^0\d+$/
+    end
+
+    def integer_like?(value : Float)
+      value % 1 == 0
     end
 
     def padded_with_whitespace?(value : String)
