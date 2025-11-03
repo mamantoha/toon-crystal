@@ -226,8 +226,15 @@ module Toon
         next_line = cursor.peek
 
         if next_line && next_line.depth > base_depth
-          nested = decode_object(cursor, base_depth + 1, delimiter, strict)
-          return {key, nested, base_depth + 1}
+          # For nested objects: decode at the correct depth
+          # In list items (base_depth is list item depth), nested objects are at +2
+          # In regular objects (base_depth is object depth), nested objects are at +1
+          # We detect list item context by checking if the previous token was after "- "
+          # For now, use the next_line's depth to determine nesting depth
+          nested_depth = next_line.depth
+          nested = decode_object(cursor, nested_depth, delimiter, strict)
+          # Return depth for subsequent fields
+          return {key, nested, nested_depth}
         end
 
         return {key, {} of String => JsonValue, base_depth + 1}
@@ -265,7 +272,8 @@ module Toon
 
         break unless line && line.depth >= item_depth
 
-        if line.depth == item_depth && line.content.starts_with?(LIST_ITEM_PREFIX)
+        # Handle both "- " (with space) and "-" (empty item)
+        if line.depth == item_depth && (line.content.starts_with?(LIST_ITEM_PREFIX) || line.content == "-")
           start_line = line.line_number if start_line.nil?
           items << decode_list_item(cursor, item_depth, delimiter, strict)
           current = cursor.current
@@ -357,7 +365,17 @@ module Toon
 
       raise DecodeError.new("Expected list item") unless line
 
+      # Handle both "- " and "-" (empty item)
+      if line.content == "-"
+        return {} of String => JsonValue
+      end
+
       after_hyphen = line.content.byte_slice(LIST_ITEM_PREFIX.size)
+
+      # Empty list item (just "- " with nothing after) should be an empty object
+      if after_hyphen.strip.empty?
+        return {} of String => JsonValue
+      end
 
       # Only treat as header when list item starts directly with '[' (no key)
       if after_hyphen.lstrip.starts_with?('[')
@@ -380,15 +398,28 @@ module Toon
       key, value, follow = decode_key_value(after_hyphen, cursor, base_depth, delimiter, strict)
       obj = {key => value} of String => JsonValue
 
+      # If the first field was a nested object (- key:), nested fields are at +2, subsequent fields at +1
+      # follow_depth is the depth returned by decode_key_value for nested objects
+      # For list items: if first field is nested object, follow = base_depth + 2; subsequent fields = base_depth + 1
+      subsequent_depth = base_depth + 1
+
       until cursor.at_end?
         line = cursor.peek
 
-        break unless line && line.depth >= follow
+        # Check if this is a subsequent field of the same list item (at base_depth + 1)
+        # or if it's a nested field of the first field's object (at follow depth, which would be base_depth + 2)
+        # We want to stop when we hit the next list item or a field at the wrong depth
+        break unless line && (line.depth == subsequent_depth || line.depth == follow)
 
-        if line.depth == follow && !line.content.starts_with?(LIST_ITEM_PREFIX)
-          k, v = decode_key_value_pair(line, cursor, follow, delimiter, strict)
+        # Stop if it's the next list item
+        break if line.depth == subsequent_depth && line.content.starts_with?(LIST_ITEM_PREFIX)
+
+        # Process as a subsequent field of this list item
+        if line.depth == subsequent_depth && !line.content.starts_with?(LIST_ITEM_PREFIX)
+          k, v = decode_key_value_pair(line, cursor, subsequent_depth, delimiter, strict)
           obj[k] = v
         else
+          # This shouldn't happen - nested fields should already be handled in decode_key_value
           break
         end
       end
@@ -548,14 +579,50 @@ module Toon
       # pattern: optional key, then [#?len<opt delim>]{<opt fields>}:<opt inline>
       trimmed = content.lstrip
 
-      # Don't match if the line starts with a quoted key
-      return nil if trimmed.starts_with?(DOUBLE_QUOTE)
+      # Check if this is just a quoted string (not a quoted key with array header)
+      # A quoted key with array header would have '[' after the closing quote
+      if trimmed.starts_with?(DOUBLE_QUOTE)
+        # Find the closing quote
+        quote_end = trimmed.index(DOUBLE_QUOTE, 1)
+        if quote_end
+          # Check if there's a '[' after the quoted section
+          after_quote = trimmed.byte_slice(quote_end + 1).lstrip
+          return nil unless after_quote.starts_with?('[')
+        else
+          # Unterminated quote, not an array header
+          return nil
+        end
+      end
 
       key : String? = nil
       rest = content
 
+      # Find the first unquoted '[' (not inside quotes)
+      idx = nil
+      in_quotes = false
+      escaped = false
+      i = 0
+      while i < rest.size
+        ch = rest[i]
+        if in_quotes
+          if !escaped && ch == '"'
+            in_quotes = false
+          end
+          escaped = (!escaped && ch == '\\')
+        else
+          if ch == '['
+            idx = i
+            break
+          end
+          if ch == '"'
+            in_quotes = true
+          end
+        end
+        i += 1
+      end
+
       # key can be quoted or unquoted up to '['
-      if idx = rest.index('[')
+      if idx
         before = rest.byte_slice(0, idx).strip
 
         if !before.empty?

@@ -5,11 +5,9 @@
 [![License](https://img.shields.io/github/license/mamantoha/toon-crystal.svg)](https://github.com/mamantoha/toon-crystal/blob/main/LICENSE)
 
 
-**Token-Oriented Object Notation** is a compact, human-readable format designed for passing structured data to Large Language Models with significantly reduced token usage.
+**Token-Oriented Object Notation** is a compact, human-readable serialization format designed for passing structured data to Large Language Models with significantly reduced token usage. It's intended for LLM input, not output.
 
-This is a Crystal port of the [TOON library](https://github.com/johannschopplich/toon) originally written in TypeScript, and ported from Ruby [library](https://github.com/andrepcg/toon-ruby).
-
-TOON excels at **uniform complex objects** – multiple fields per row, same structure across items. It borrows YAML's indentation-based structure for nested objects and CSV's tabular format for uniform data rows, then optimizes both for token efficiency in LLM contexts.
+This is a Crystal port of the [TOON library](https://github.com/toon-format/toon) originally written in TypeScript.
 
 ## Why TOON?
 
@@ -274,11 +272,31 @@ After checking out the repo, run:
 shards install
 ```
 
+### Updating the Spec Submodule
+
+This project uses the [TOON specification repository](https://github.com/toon-format/spec) as a git submodule at `ext/spec`. This contains the language-agnostic test fixtures.
+
+**Initial setup** (when cloning the repo):
+```bash
+git submodule update --init --recursive
+```
+
+**Update the spec submodule** to get the latest test fixtures:
+```bash
+git submodule update --remote ext/spec
+```
+
+This will pull the latest commits from the upstream spec repository and update the submodule reference.
+
+### Running Tests
+
 Run the test suite:
 
 ```bash
 crystal spec
 ```
+
+The test suite uses fixtures from `ext/spec/tests/fixtures/` and automatically discovers all fixture files in the encode and decode directories.
 
 ## Contributing
 
@@ -298,4 +316,4 @@ The project is available as open source under the terms of the [MIT License](LIC
 
 ## Credits
 
-This is a Crystal port of the original [TOON library](https://github.com/johannschopplich/toon) by [Johann Schopplich](https://github.com/johannschopplich).
+This is a Crystal port of the original [TOON library](https://github.com/toon-format/toon).
