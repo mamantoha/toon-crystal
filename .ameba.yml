@@ -3,3 +3,10 @@ Metrics/CyclomaticComplexity:
 
 Naming/BlockParameterName:
   Enabled: false
+
+Lint/ElseNil:
+  Enabled: false
+
+Lint/SpecFilename:
+  Excluded:
+  - spec/fixture_helper.cr
