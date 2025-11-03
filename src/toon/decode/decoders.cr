@@ -85,7 +85,7 @@ module Toon
       result = [] of ParsedLine
       blank_lines = [] of Int32
 
-      input.split('\n').each_with_index do |raw, i|
+      input.each_line.with_index do |raw, i|
         line_number = i + 1
 
         if raw.strip.empty?
