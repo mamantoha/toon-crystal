@@ -19,9 +19,6 @@ describe "TOON Encoding Fixtures" do
             should_error = test_case.as_h.fetch("shouldError", JSON::Any.new(false)).as_bool
             options = FixtureHelper.extract_options(test_case)
 
-            # Expected TOON string (JSON.parse already handles escapes)
-            expected_normalized = expected
-
             # Extract options
             delimiter = FixtureHelper.get_delimiter(options)
             indent = FixtureHelper.get_indent(options)
@@ -37,7 +34,7 @@ describe "TOON Encoding Fixtures" do
               end
             else
               result = Toon.encode(input_value, indent: indent, delimiter: delimiter, length_marker: length_marker)
-              result.should eq(expected_normalized), "Category: #{category}\nDescription: #{description}\nTest: #{name}\nExpected: #{expected_normalized}\nGot: #{result}"
+              result.should eq(expected), "Category: #{category}\nDescription: #{description}\nTest: #{name}\nExpected: #{expected}\nGot: #{result}"
             end
           end
         end
