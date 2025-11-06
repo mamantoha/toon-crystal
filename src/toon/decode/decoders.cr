@@ -124,7 +124,8 @@ module Toon
 
     private def decode_value_from_lines(cursor : LineCursor, delimiter : String, strict : Bool) : JsonValue
       first = cursor.peek
-      raise DecodeError.new("No content to decode") unless first
+      # Empty document decodes to empty object
+      return {} of String => JsonValue unless first
 
       if parsed = parse_array_header_line(first.content)
         header, inline_values = parsed
@@ -529,7 +530,20 @@ module Toon
           return str.to_i64
         end
 
-        return str.to_f64
+        # Parse as float first
+        float_val = str.to_f64
+
+        # Normalize -0.0 to 0 (check if string starts with '-' and value is zero)
+        if float_val == 0.0 && str.starts_with?('-')
+          return 0_i64
+        end
+
+        # If the float is a whole number, return as integer
+        if float_val == float_val.trunc
+          return float_val.to_i64
+        end
+
+        return float_val
       end
 
       # bare string
