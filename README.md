@@ -9,6 +9,8 @@
 
 This is a Crystal port of the [TOON library](https://github.com/toon-format/toon) originally written in TypeScript.
 
+> **Note:** This implementation supports **TOON Format Specification Version 1.4** (2025-11-05).
+
 ## Why TOON?
 
 AI is becoming cheaper and more accessible, but larger context windows allow for larger data inputs as well. **LLM tokens still cost money** – and standard JSON is verbose and token-expensive:
