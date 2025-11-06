@@ -1,4 +1,4 @@
-# TOON for Crystal
+# TOON Format for Crystal
 
 [![Crystal CI](https://github.com/mamantoha/toon-crystal/actions/workflows/crystal.yml/badge.svg)](https://github.com/mamantoha/toon-crystal/actions/workflows/crystal.yml)
 [![GitHub release](https://img.shields.io/github/release/mamantoha/toon-crystal.svg)](https://github.com/mamantoha/flag_emoji/releases)
@@ -172,6 +172,13 @@ crystal spec
 ```
 
 The test suite uses fixtures from `ext/spec/tests/fixtures/` and automatically discovers all fixture files in the encode and decode directories.
+
+## Resources
+
+- [TOON Specification](https://github.com/toon-format/spec/blob/main/SPEC.md)
+- [Main Repository](https://github.com/toon-format/toon)
+- [Benchmarks & Performance](https://github.com/toon-format/toon#benchmarks)
+- [Other Language Implementations](https://github.com/toon-format/toon#other-implementations)
 
 ## Contributing
 
