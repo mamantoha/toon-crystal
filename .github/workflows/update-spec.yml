@@ -1,0 +1,116 @@
+name: Update Spec Submodule
+
+on:
+  schedule:
+    # Run daily at 00:00 UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+    # Allow manual triggering
+
+jobs:
+  check-and-update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Install Crystal
+        uses: crystal-lang/install-crystal@v1
+
+      - name: Check out repository code
+        uses: actions/checkout@v5
+        with:
+          submodules: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get current submodule commit
+        id: current_commit
+        run: |
+          cd ext/spec
+          CURRENT_COMMIT=$(git rev-parse HEAD)
+          echo "current_commit=$CURRENT_COMMIT" >> $GITHUB_OUTPUT
+          echo "Current submodule commit: $CURRENT_COMMIT"
+
+      - name: Check for updates
+        id: check_update
+        run: |
+          CURRENT_COMMIT="${{ steps.current_commit.outputs.current_commit }}"
+          echo "Current submodule commit: $CURRENT_COMMIT"
+
+          # Get the latest commit on main branch
+          LATEST_COMMIT=$(curl -s https://api.github.com/repos/toon-format/spec/commits/main | jq -r '.sha')
+          echo "Latest commit on main: $LATEST_COMMIT"
+
+          # Get the latest release (if any)
+          LATEST_RELEASE=$(curl -s https://api.github.com/repos/toon-format/spec/releases/latest | jq -r '.tag_name // empty')
+
+          if [ -n "$LATEST_RELEASE" ]; then
+            echo "Latest release: $LATEST_RELEASE"
+            # Get the commit SHA for the latest release
+            RELEASE_COMMIT=$(curl -s "https://api.github.com/repos/toon-format/spec/git/refs/tags/$LATEST_RELEASE" | jq -r '.object.sha // empty')
+            if [ -z "$RELEASE_COMMIT" ]; then
+              # Try alternative: get commit from release
+              RELEASE_COMMIT=$(curl -s "https://api.github.com/repos/toon-format/spec/releases/latest" | jq -r '.target_commitish // empty')
+            fi
+            echo "Release commit: $RELEASE_COMMIT"
+          fi
+
+          # Check if we need to update (use main branch as source of truth)
+          if [ "$LATEST_COMMIT" != "$CURRENT_COMMIT" ] && [ -n "$LATEST_COMMIT" ]; then
+            echo "has_update=true" >> $GITHUB_OUTPUT
+            echo "latest_commit=$LATEST_COMMIT" >> $GITHUB_OUTPUT
+            if [ -n "$LATEST_RELEASE" ] && [ "$RELEASE_COMMIT" == "$LATEST_COMMIT" ]; then
+              echo "latest_tag=$LATEST_RELEASE" >> $GITHUB_OUTPUT
+              echo "Update available: $CURRENT_COMMIT -> $LATEST_COMMIT (release: $LATEST_RELEASE)"
+            else
+              echo "latest_tag=" >> $GITHUB_OUTPUT
+              echo "Update available: $CURRENT_COMMIT -> $LATEST_COMMIT"
+            fi
+          else
+            echo "has_update=false" >> $GITHUB_OUTPUT
+            echo "Submodule is up to date"
+          fi
+
+      - name: Update submodule
+        if: steps.check_update.outputs.has_update == 'true'
+        run: |
+          cd ext/spec
+          git fetch origin
+          LATEST_COMMIT="${{ steps.check_update.outputs.latest_commit }}"
+          git checkout $LATEST_COMMIT
+          cd ../..
+          git add ext/spec
+
+      - name: Install dependencies
+        if: steps.check_update.outputs.has_update == 'true'
+        run: shards install --skip-postinstall --skip-executables
+
+      - name: Run tests
+        if: steps.check_update.outputs.has_update == 'true'
+        run: crystal spec
+
+      - name: Create Pull Request
+        if: steps.check_update.outputs.has_update == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: update-spec-${{ github.run_id }}
+          commit-message: |
+            chore: update spec submodule${{ steps.check_update.outputs.latest_tag && format(' to {0}', steps.check_update.outputs.latest_tag) || format(' to {0}', steps.check_update.outputs.latest_commit) }}
+          title: "chore: update spec submodule${{ steps.check_update.outputs.latest_tag && format(' to {0}', steps.check_update.outputs.latest_tag) || format(' to {0}', steps.check_update.outputs.latest_commit) }}"
+          body: |
+            This PR updates the spec submodule to the latest version.
+
+            **Changes:**
+            - Updated `ext/spec` submodule
+            - Previous commit: `${{ steps.current_commit.outputs.current_commit }}`
+            - New commit: `${{ steps.check_update.outputs.latest_commit }}`
+            ${{ steps.check_update.outputs.latest_tag && format('- Latest release: **{0}**', steps.check_update.outputs.latest_tag) || '' }}
+
+            **Tests:** All tests passed ✅
+
+            This PR was automatically created by the [update-spec workflow](.github/workflows/update-spec.yml).
+          labels: |
+            dependencies
+            automated
+          delete-branch: true
