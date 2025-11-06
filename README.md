@@ -10,27 +10,6 @@ This is a Crystal reference implementation of the [TOON format specification](ht
 
 > **Note:** This implementation supports **TOON Format Specification Version 1.4** (2025-11-05).
 
-## Why TOON?
-
-AI is becoming cheaper and more accessible, but larger context windows allow for larger data inputs as well. **LLM tokens still cost money** – and standard JSON is verbose and token-expensive:
-
-```json
-{
-  "users": [
-    { "id": 1, "name": "Alice", "role": "admin" },
-    { "id": 2, "name": "Bob", "role": "user" }
-  ]
-}
-```
-
-TOON conveys the same information with **fewer tokens**:
-
-```
-users[2]{id,name,role}:
-  1,Alice,admin
-  2,Bob,user
-```
-
 ## Installation
 
 Add this to your `shard.yml`:
