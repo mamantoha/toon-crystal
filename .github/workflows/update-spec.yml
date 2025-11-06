@@ -14,9 +14,6 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - name: Install Crystal
-        uses: crystal-lang/install-crystal@v1
-
       - name: Check out repository code
         uses: actions/checkout@v5
         with:
@@ -81,14 +78,6 @@ jobs:
           cd ../..
           git add ext/spec
 
-      - name: Install dependencies
-        if: steps.check_update.outputs.has_update == 'true'
-        run: shards install --skip-postinstall --skip-executables
-
-      - name: Run tests
-        if: steps.check_update.outputs.has_update == 'true'
-        run: crystal spec
-
       - name: Create Pull Request
         if: steps.check_update.outputs.has_update == 'true'
         uses: peter-evans/create-pull-request@v7
@@ -106,8 +95,6 @@ jobs:
             - Previous commit: `${{ steps.current_commit.outputs.current_commit }}`
             - New commit: `${{ steps.check_update.outputs.latest_commit }}`
             ${{ steps.check_update.outputs.latest_tag && format('- Latest release: **{0}**', steps.check_update.outputs.latest_tag) || '' }}
-
-            **Tests:** All tests passed ✅
 
             This PR was automatically created by the [update-spec workflow](.github/workflows/update-spec.yml).
           labels: |
