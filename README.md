@@ -4,10 +4,9 @@
 [![GitHub release](https://img.shields.io/github/release/mamantoha/toon-crystal.svg)](https://github.com/mamantoha/flag_emoji/releases)
 [![License](https://img.shields.io/github/license/mamantoha/toon-crystal.svg)](https://github.com/mamantoha/toon-crystal/blob/main/LICENSE)
 
-
 **Token-Oriented Object Notation** is a compact, human-readable serialization format designed for passing structured data to Large Language Models with significantly reduced token usage. It's intended for LLM input, not output.
 
-This is a Crystal port of the [TOON library](https://github.com/toon-format/toon) originally written in TypeScript.
+This is a Crystal reference implementation of the [TOON format specification](https://github.com/toon-format/spec).
 
 > **Note:** This implementation supports **TOON Format Specification Version 1.4** (2025-11-05).
 
@@ -31,24 +30,6 @@ users[2]{id,name,role}:
   1,Alice,admin
   2,Bob,user
 ```
-
-## Format Comparison
-
-Format familiarity matters as much as token count.
-
-- **CSV:** best for uniform tables.
-- **JSON:** best for non-uniform data.
-- **TOON:** best for uniform complex (but not deeply nested) objects.
-
-TOON switches to list format for non-uniform arrays. In those cases, JSON can be cheaper at scale.
-
-## Key Features
-
-- 💸 **Token-efficient:** typically 30–60% fewer tokens than JSON
-- 🤿 **LLM-friendly guardrails:** explicit lengths and field lists help models validate output
-- 🍱 **Minimal syntax:** removes redundant punctuation (braces, brackets, most quotes)
-- 📐 **Indentation-based structure:** replaces braces with whitespace for better readability
-- 🧺 **Tabular arrays:** declare keys once, then stream rows without repetition
 
 ## Installation
 
@@ -315,7 +296,3 @@ The test suite uses fixtures from `ext/spec/tests/fixtures/` and automatically d
 ## License
 
 The project is available as open source under the terms of the [MIT License](LICENSE).
-
-## Credits
-
-This is a Crystal port of the original [TOON library](https://github.com/toon-format/toon).
