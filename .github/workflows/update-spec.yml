@@ -55,21 +55,30 @@ jobs:
             echo "Release commit: $RELEASE_COMMIT"
           fi
 
-          # Check if we need to update (use main branch as source of truth)
-          if [ "$LATEST_COMMIT" != "$CURRENT_COMMIT" ] && [ -n "$LATEST_COMMIT" ]; then
-            echo "has_update=true" >> $GITHUB_OUTPUT
-            echo "latest_commit=$LATEST_COMMIT" >> $GITHUB_OUTPUT
-            if [ -n "$LATEST_RELEASE" ] && [ "$RELEASE_COMMIT" == "$LATEST_COMMIT" ]; then
-              echo "latest_tag=$LATEST_RELEASE" >> $GITHUB_OUTPUT
-              echo "Update available: $CURRENT_COMMIT -> $LATEST_COMMIT (release: $LATEST_RELEASE)"
-            else
-              echo "latest_tag=" >> $GITHUB_OUTPUT
-              echo "Update available: $CURRENT_COMMIT -> $LATEST_COMMIT"
-            fi
-          else
-            echo "has_update=false" >> $GITHUB_OUTPUT
-            echo "Submodule is up to date"
-          fi
+          # TEMPORARY: Force workflow to run for testing (always set has_update=true)
+          # TODO: Remove this after verification and restore the original check below
+          echo "⚠️  TEST MODE: Forcing workflow to run regardless of update status"
+          echo "has_update=true" >> $GITHUB_OUTPUT
+          echo "latest_commit=$CURRENT_COMMIT" >> $GITHUB_OUTPUT
+          echo "latest_tag=" >> $GITHUB_OUTPUT
+          echo "Test mode: Using current commit to verify workflow"
+
+          # Original check (commented out for testing):
+          # # Check if we need to update (use main branch as source of truth)
+          # if [ "$LATEST_COMMIT" != "$CURRENT_COMMIT" ] && [ -n "$LATEST_COMMIT" ]; then
+          #   echo "has_update=true" >> $GITHUB_OUTPUT
+          #   echo "latest_commit=$LATEST_COMMIT" >> $GITHUB_OUTPUT
+          #   if [ -n "$LATEST_RELEASE" ] && [ "$RELEASE_COMMIT" == "$LATEST_COMMIT" ]; then
+          #     echo "latest_tag=$LATEST_RELEASE" >> $GITHUB_OUTPUT
+          #     echo "Update available: $CURRENT_COMMIT -> $LATEST_COMMIT (release: $LATEST_RELEASE)"
+          #   else
+          #     echo "latest_tag=" >> $GITHUB_OUTPUT
+          #     echo "Update available: $CURRENT_COMMIT -> $LATEST_COMMIT"
+          #   fi
+          # else
+          #   echo "has_update=false" >> $GITHUB_OUTPUT
+          #   echo "Submodule is up to date"
+          # fi
 
       - name: Update submodule
         if: steps.check_update.outputs.has_update == 'true'
@@ -99,6 +108,8 @@ jobs:
             chore: update spec submodule${{ steps.check_update.outputs.latest_tag && format(' to {0}', steps.check_update.outputs.latest_tag) || format(' to {0}', steps.check_update.outputs.latest_commit) }}
           title: "chore: update spec submodule${{ steps.check_update.outputs.latest_tag && format(' to {0}', steps.check_update.outputs.latest_tag) || format(' to {0}', steps.check_update.outputs.latest_commit) }}"
           body: |
+            ⚠️ **TEST MODE**: This PR was created to verify the workflow is working correctly.
+
             This PR updates the spec submodule to the latest version.
 
             **Changes:**
@@ -110,6 +121,8 @@ jobs:
             **Tests:** All tests passed ✅
 
             This PR was automatically created by the [update-spec workflow](.github/workflows/update-spec.yml).
+
+            **Note:** This is a test run. Please close this PR without merging after verification.
           labels: |
             dependencies
             automated
