@@ -159,6 +159,23 @@ module FixtureHelper
     end
   end
 
+  # Get expandPaths from options
+  def get_expand_paths(options : Hash(String, JSON::Any)) : Toon::ExpandPathsMode
+    if options.has_key?("expandPaths")
+      value = options["expandPaths"]
+      case value.raw
+      when String
+        Toon::ExpandPathsMode.parse(value.as_s)
+      when Symbol
+        Toon::ExpandPathsMode.parse(value.as_s)
+      else
+        Toon::ExpandPathsMode.parse(value.to_s)
+      end
+    else
+      Toon::ExpandPathsMode::Off
+    end
+  end
+
   # Get length_marker from options
   def get_length_marker(options : Hash(String, JSON::Any)) : String | Bool
     if options.has_key?("lengthMarker")
@@ -166,6 +183,39 @@ module FixtureHelper
       marker.empty? ? false : marker
     else
       false
+    end
+  end
+
+  # Get keyFolding from options
+  def get_key_folding(options : Hash(String, JSON::Any)) : Toon::KeyFoldingMode
+    if options.has_key?("keyFolding")
+      value = options["keyFolding"]
+      case value.raw
+      when String
+        Toon::KeyFoldingMode.parse(value.as_s)
+      when Symbol
+        Toon::KeyFoldingMode.parse(value.as_s)
+      else
+        Toon::KeyFoldingMode.parse(value.to_s)
+      end
+    else
+      Toon::KeyFoldingMode::Off
+    end
+  end
+
+  # Get flattenDepth from options (nil means Infinity/default)
+  def get_flatten_depth(options : Hash(String, JSON::Any)) : Int32?
+    return nil unless options.has_key?("flattenDepth")
+
+    value = options["flattenDepth"]
+
+    # flattenDepth might be represented as a number or a string ("Infinity")
+    if value.raw.is_a?(String)
+      str = value.as_s
+      return nil if str.downcase == "infinity"
+      str.to_i32
+    else
+      value.as_i64.to_i32
     end
   end
 

@@ -22,14 +22,15 @@ describe "TOON Decoding Fixtures" do
             # Extract options
             indent = FixtureHelper.get_indent(options)
             strict = FixtureHelper.get_strict(options)
+            expand_paths = FixtureHelper.get_expand_paths(options)
 
             # Run decode
             if should_error
               expect_raises(Toon::DecodeError) do
-                Toon.decode(input, indent: indent, strict: strict)
+                Toon.decode(input, indent: indent, strict: strict, expand_paths: expand_paths)
               end
             else
-              result = Toon.decode(input, indent: indent, strict: strict)
+              result = Toon.decode(input, indent: indent, strict: strict, expand_paths: expand_paths)
               FixtureHelper.json_equal?(result, expected).should be_true, "Category: #{category}\nDescription: #{description}\nTest: #{name}\nExpected: #{expected}\nGot: #{result}"
             end
           end

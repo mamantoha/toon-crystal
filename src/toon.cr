@@ -16,9 +16,15 @@ module Toon
   # @param delimiter : Delimiter for array values and tabular rows (default: ',')
   # @param length_marker : Optional marker to prefix array lengths (default: false)
   # @return : TOON-formatted string
-  def encode(input, indent : Int32 = 2, delimiter : String | Char = DEFAULT_DELIMITER, length_marker : String | Bool = false)
+  def encode(input, indent : Int32 = 2, delimiter : String | Char = DEFAULT_DELIMITER, length_marker : String | Bool = false, key_folding : KeyFoldingMode = KeyFoldingMode::Off, flatten_depth : Int32? = nil)
     normalized_value = Normalizer.normalize_value(input)
-    options = resolve_options(indent: indent, delimiter: delimiter, length_marker: length_marker)
+    options = resolve_options(
+      indent: indent,
+      delimiter: delimiter,
+      length_marker: length_marker,
+      key_folding: key_folding,
+      flatten_depth: flatten_depth
+    )
     Encoders.encode_value(normalized_value, options)
   end
 
@@ -28,15 +34,18 @@ module Toon
   # @param indent : Number of spaces per indentation level (default: 2)
   # @param strict : Whether to enable strict validations (currently minimal)
   # @return : Decoded Crystal value
-  def decode(input : String, indent : Int32 = 2, strict : Bool = true)
-    Decoders.decode_value(input, indent, strict)
+  def decode(input : String, indent : Int32 = 2, strict : Bool = true, expand_paths : ExpandPathsMode = ExpandPathsMode::Off)
+    Decoders.decode_value(input, indent, strict, expand_paths)
   end
 
-  private def resolve_options(indent : Int32, delimiter : String | Char, length_marker : String | Bool)
+  private def resolve_options(indent : Int32, delimiter : String | Char, length_marker : String | Bool, key_folding : KeyFoldingMode, flatten_depth : Int32?)
     {
-      indent:        indent,
-      delimiter:     delimiter.to_s,
-      length_marker: length_marker,
+      indent:           indent,
+      delimiter:        delimiter.to_s,
+      length_marker:    length_marker,
+      key_folding_mode: key_folding,
+      flatten_depth:    flatten_depth,
+      flatten_limit:    flatten_depth ? flatten_depth : Int32::MAX,
     }
   end
 end
