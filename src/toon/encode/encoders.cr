@@ -52,84 +52,25 @@ module Toon
       return {key, value, false, nil} if limit < 2
       return {key, value, folding_enabled, nil} unless foldable_segment?(key)
 
-      segments = [key]
-      current_value = value
-      reason = :start
+      segments, current_value, reason = build_folded_segments(key, value, parent, limit)
 
-      while segments.size < limit
-        unless current_value.is_a?(Hash(String, Decoders::JsonValue))
-          reason = :leaf
-          break
-        end
+      # Handle collision case
+      return {key, value, false, nil} if reason == :collision
 
-        child_hash = current_value.as(Hash(String, Decoders::JsonValue))
-        child_keys = child_hash.keys
-
-        if child_keys.size != 1
-          reason = :branch
-          break
-        end
-
-        next_key = child_keys.first
-        unless foldable_segment?(next_key)
-          reason = :unfoldable
-          break
-        end
-
-        candidate_segments = segments + [next_key]
-        folded_candidate = candidate_segments.join('.')
-
-        if parent.has_key?(folded_candidate)
-          return {key, value, false, nil}
-        end
-
-        segments << next_key
-        current_value = child_hash[next_key]
-        reason = :continued
-      end
-
-      if segments.size == limit && current_value.is_a?(Hash(String, Decoders::JsonValue))
-        reason = :limit
-      end
-
+      # Single segment - no folding occurred
       if segments.size == 1
-        child_enabled =
-          case reason
-          when :unfoldable, :limit
-            false
-          else
-            folding_enabled
-          end
-
+        child_enabled = case reason
+                       when :unfoldable, :limit
+                         false
+                       else
+                         folding_enabled
+                       end
         return {key, value, child_enabled, nil}
       end
 
-      # Heuristic: avoid folding two-segment chains when parent has multiple keys
+      # Multiple segments - folding occurred
       folded_key = segments.join('.')
-
-      child_enabled = folding_enabled
-      child_limit : Int32? = nil
-
-      if current_value.is_a?(Hash(String, Decoders::JsonValue))
-        case reason
-        when :limit, :unfoldable
-          child_enabled = false
-        when :branch
-          child_enabled = folding_enabled
-          child_limit = nil
-        else
-          remaining = limit - segments.size
-
-          if remaining >= 2
-            child_limit = remaining
-          else
-            child_enabled = false
-          end
-        end
-      else
-        child_enabled = folding_enabled
-        child_limit = nil
-      end
+      child_enabled, child_limit = compute_child_folding_settings(current_value, segments.size, limit, reason, folding_enabled)
 
       {folded_key, current_value, child_enabled, child_limit}
     end
@@ -384,6 +325,93 @@ module Toon
         folded_key, folded_value, child_enabled, child_limit = maybe_fold_key(key, raw, obj, options, folding_enabled, chain_limit)
         emit_key_value_pair(folded_key, folded_value, writer, depth + 1, options, child_enabled, child_limit)
       end
+    end
+
+    # Helper methods for key folding
+
+    # Check if a key folding chain can continue with the given value
+    private def can_continue_folding?(value : Decoders::JsonValue, segments_size : Int32, limit : Int32) : Bool
+      return false unless value.is_a?(Hash(String, Decoders::JsonValue))
+      return false if segments_size >= limit
+
+      child_hash = value.as(Hash(String, Decoders::JsonValue))
+      child_keys = child_hash.keys
+
+      child_keys.size == 1 && foldable_segment?(child_keys.first)
+    end
+
+    # Build folded key segments by traversing the nested structure
+    private def build_folded_segments(key : String, value : Decoders::JsonValue, parent : Hash(String, Decoders::JsonValue), limit : Int32) : {Array(String), Decoders::JsonValue, Symbol}
+      segments = [key]
+      current_value = value
+      reason = :start
+
+      while segments.size < limit
+        unless current_value.is_a?(Hash(String, Decoders::JsonValue))
+          reason = :leaf
+          break
+        end
+
+        child_hash = current_value.as(Hash(String, Decoders::JsonValue))
+        child_keys = child_hash.keys
+
+        if child_keys.size != 1
+          reason = :branch
+          break
+        end
+
+        next_key = child_keys.first
+        unless foldable_segment?(next_key)
+          reason = :unfoldable
+          break
+        end
+
+        candidate_segments = segments + [next_key]
+        folded_candidate = candidate_segments.join('.')
+
+        if parent.has_key?(folded_candidate)
+          return {segments, current_value, :collision}
+        end
+
+        segments << next_key
+        current_value = child_hash[next_key]
+        reason = :continued
+      end
+
+      if segments.size == limit && current_value.is_a?(Hash(String, Decoders::JsonValue))
+        reason = :limit
+      end
+
+      {segments, current_value, reason}
+    end
+
+    # Determine child folding settings based on folding results
+    private def compute_child_folding_settings(current_value : Decoders::JsonValue, segments_size : Int32, limit : Int32, reason : Symbol, folding_enabled : Bool) : {Bool, Int32?}
+      child_enabled = folding_enabled
+      child_limit : Int32? = nil
+
+      if current_value.is_a?(Hash(String, Decoders::JsonValue))
+        case reason
+        when :limit, :unfoldable
+          child_enabled = false
+        when :branch
+          child_enabled = folding_enabled
+          child_limit = nil
+        else
+          remaining = limit - segments_size
+
+          if remaining >= 2
+            child_limit = remaining
+          else
+            child_enabled = false
+          end
+        end
+      else
+        child_enabled = folding_enabled
+        child_limit = nil
+      end
+
+      {child_enabled, child_limit}
     end
   end
 end
