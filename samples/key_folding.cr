@@ -26,7 +26,7 @@ input_str = "a.b.c: 1"
 
 decoded = Toon.decode(
   input_str,
-  expand_paths: Toon::ExpandPathsMode::Safe,
+  expand_paths: :safe,
   strict: true
 )
 
