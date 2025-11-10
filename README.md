@@ -8,7 +8,7 @@
 
 This is a Crystal reference implementation of the [TOON format specification](https://github.com/toon-format/spec).
 
-> **Note:** This implementation supports **TOON Format Specification Version 1.5** (2025-11-10).
+> **Note:** This implementation supports **TOON Format Specification Version 2.0** (2025-11-10).
 
 ## Installation
 
@@ -73,7 +73,7 @@ value = Toon.decode(toon)
 
 ## API
 
-### `Toon.encode(value, *, indent = 2, delimiter = ',', length_marker = false, key_folding = KeyFoldingMode::Off, flatten_depth = nil)`
+### `Toon.encode(value, *, indent = 2, delimiter = ',', key_folding = KeyFoldingMode::Off, flatten_depth = nil)`
 
 Converts any value to TOON format.
 
@@ -82,7 +82,6 @@ Converts any value to TOON format.
 - `value` – Any value to encode (Hash, Array, primitives, or nested structures)
 - `indent` – Number of spaces per indentation level (default: `2`)
 - `delimiter` – Delimiter for array values and tabular rows: `','`, `'\t'`, or `'|'` (default: `','`)
-- `length_marker` – Optional marker to prefix array lengths: `'#'` or `false` (default: `false`)
 - `key_folding` – Optional key folding mode (`KeyFoldingMode::Off` | `KeyFoldingMode::Safe`), defaults to `Off`
 - `flatten_depth` – Optional max number of segments to fold when `key_folding` is `Safe` (default: Infinity when `nil`)
 
@@ -116,10 +115,6 @@ Toon.encode({ "items" => items })
 # Custom delimiter (tab)
 Toon.encode({ "items" => items }, delimiter: '\t')
 # => "items[2	]{sku	qty	price}:\n  A1\t2\t9.99\n  B2\t1\t14.5"
-
-# Length marker
-Toon.encode({ "tags" => ["a", "b", "c"] }, length_marker: '#')
-# => "tags[#3]: a,b,c"
 ```
 
 ### `Toon.decode(input, *, indent = 2, strict = true, expand_paths = ExpandPathsMode::Off)`
