@@ -105,10 +105,6 @@ module Toon
       end
 
       # Heuristic: avoid folding two-segment chains when parent has multiple keys
-      if segments.size == 2 && parent.size > 1
-        return {key, value, folding_enabled, nil}
-      end
-
       folded_key = segments.join('.')
 
       child_enabled = folding_enabled
