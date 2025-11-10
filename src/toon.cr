@@ -15,6 +15,8 @@ module Toon
   # @param indent : Number of spaces per indentation level (default: 2)
   # @param delimiter : Delimiter for array values and tabular rows (default: ',')
   # @param length_marker : Optional marker to prefix array lengths (default: false)
+  # @param key_folding : Key folding mode (KeyFoldingMode::Off | KeyFoldingMode::Safe), default: Off
+  # @param flatten_depth : Max number of segments to fold when key_folding is Safe (nil = Infinity)
   # @return : TOON-formatted string
   def encode(input, indent : Int32 = 2, delimiter : String | Char = DEFAULT_DELIMITER, length_marker : String | Bool = false, key_folding : KeyFoldingMode = KeyFoldingMode::Off, flatten_depth : Int32? = nil)
     normalized_value = Normalizer.normalize_value(input)
@@ -32,7 +34,8 @@ module Toon
   #
   # @param input : TOON-formatted string
   # @param indent : Number of spaces per indentation level (default: 2)
-  # @param strict : Whether to enable strict validations (currently minimal)
+  # @param strict : Enable strict validations (indentation, no tabs, no blank lines inside arrays, exact counts) (default: true)
+  # @param expand_paths : Path expansion mode (ExpandPathsMode::Off | ExpandPathsMode::Safe), default: Off
   # @return : Decoded Crystal value
   def decode(input : String, indent : Int32 = 2, strict : Bool = true, expand_paths : ExpandPathsMode = ExpandPathsMode::Off)
     Decoders.decode_value(input, indent, strict, expand_paths)
