@@ -1,5 +1,6 @@
 require "../constants"
 require "./error"
+require "./string_parser"
 
 module Toon
   # Lightweight line representation for decoding
@@ -550,48 +551,11 @@ module Toon
 
     # --- Parsing helpers ---
     private def key_value_line?(content : String) : Bool
-      # detect a colon outside of quotes
-      i = 0
-      in_quotes = false
-      escaped = false
-
-      while i < content.size
-        ch = content[i]
-
-        if in_quotes
-          if !escaped && ch == '"'
-            in_quotes = false
-          end
-          escaped = (!escaped && ch == '\\')
-        else
-          return true if ch == ':'
-          in_quotes = true if ch == '"'
-        end
-        i += 1
-      end
-
-      false
+      StringParser.contains_unquoted_colon?(content)
     end
 
     private def find_unquoted_colon_index(content : String) : Int32?
-      i = 0
-      in_quotes = false
-      escaped = false
-
-      while i < content.size
-        ch = content[i]
-        if in_quotes
-          if !escaped && ch == '"'
-            in_quotes = false
-          end
-          escaped = (!escaped && ch == '\\')
-        else
-          return i if ch == ':'
-          in_quotes = true if ch == '"'
-        end
-        i += 1
-      end
-      nil
+      StringParser.find_unquoted_colon_index(content)
     end
 
     private def parse_key_token(content : String) : {KeyToken, String}
