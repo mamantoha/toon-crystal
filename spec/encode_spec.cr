@@ -23,6 +23,8 @@ describe "TOON Encoding Fixtures" do
             delimiter = FixtureHelper.get_delimiter(options)
             indent = FixtureHelper.get_indent(options)
             length_marker = FixtureHelper.get_length_marker(options)
+            key_folding = FixtureHelper.get_key_folding(options)
+            flatten_depth = FixtureHelper.get_flatten_depth(options)
 
             # Convert input to Crystal value (can be primitive, hash, array)
             input_value = FixtureHelper.json_to_encode_input(input)
@@ -30,10 +32,24 @@ describe "TOON Encoding Fixtures" do
             # Run encode
             if should_error
               expect_raises(Exception) do
-                Toon.encode(input_value, indent: indent, delimiter: delimiter, length_marker: length_marker)
+                Toon.encode(
+                  input_value,
+                  indent: indent,
+                  delimiter: delimiter,
+                  length_marker: length_marker,
+                  key_folding: key_folding,
+                  flatten_depth: flatten_depth
+                )
               end
             else
-              result = Toon.encode(input_value, indent: indent, delimiter: delimiter, length_marker: length_marker)
+              result = Toon.encode(
+                input_value,
+                indent: indent,
+                delimiter: delimiter,
+                length_marker: length_marker,
+                key_folding: key_folding,
+                flatten_depth: flatten_depth
+              )
               result.should eq(expected), "Category: #{category}\nDescription: #{description}\nTest: #{name}\nExpected: #{expected}\nGot: #{result}"
             end
           end

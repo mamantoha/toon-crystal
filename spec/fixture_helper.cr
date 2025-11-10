@@ -159,6 +159,15 @@ module FixtureHelper
     end
   end
 
+  # Get expandPaths from options
+  def get_expand_paths(options : Hash(String, JSON::Any)) : String
+    if options.has_key?("expandPaths")
+      options["expandPaths"].as_s
+    else
+      "off"
+    end
+  end
+
   # Get length_marker from options
   def get_length_marker(options : Hash(String, JSON::Any)) : String | Bool
     if options.has_key?("lengthMarker")
@@ -166,6 +175,31 @@ module FixtureHelper
       marker.empty? ? false : marker
     else
       false
+    end
+  end
+
+  # Get keyFolding from options
+  def get_key_folding(options : Hash(String, JSON::Any)) : String
+    if options.has_key?("keyFolding")
+      options["keyFolding"].as_s
+    else
+      "off"
+    end
+  end
+
+  # Get flattenDepth from options (nil means Infinity/default)
+  def get_flatten_depth(options : Hash(String, JSON::Any)) : Int32?
+    return nil unless options.has_key?("flattenDepth")
+
+    value = options["flattenDepth"]
+
+    # flattenDepth might be represented as a number or a string ("Infinity")
+    if value.raw.is_a?(String)
+      str = value.as_s
+      return nil if str.downcase == "infinity"
+      str.to_i32
+    else
+      value.as_i64.to_i32
     end
   end
 
