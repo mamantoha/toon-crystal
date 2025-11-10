@@ -160,11 +160,19 @@ module FixtureHelper
   end
 
   # Get expandPaths from options
-  def get_expand_paths(options : Hash(String, JSON::Any)) : String
+  def get_expand_paths(options : Hash(String, JSON::Any)) : Toon::ExpandPathsMode
     if options.has_key?("expandPaths")
-      options["expandPaths"].as_s
+      value = options["expandPaths"]
+      case value.raw
+      when String
+        Toon::ExpandPathsMode.parse(value.as_s)
+      when Symbol
+        Toon::ExpandPathsMode.parse(value.as_s)
+      else
+        Toon::ExpandPathsMode.parse(value.to_s)
+      end
     else
-      "off"
+      Toon::ExpandPathsMode::Off
     end
   end
 

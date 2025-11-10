@@ -28,4 +28,28 @@ module Toon
   TAB             = '\t'
 
   DEFAULT_DELIMITER = COMMA
+
+  enum ExpandPathsMode
+    Off
+    Safe
+
+    def safe?
+      self == Safe
+    end
+
+    def self.parse(value : String) : self
+      case value.downcase
+      when "off"
+        Off
+      when "safe"
+        Safe
+      else
+        raise ArgumentError.new("Unknown expandPaths mode: #{value}")
+      end
+    end
+
+    def self.parse(value : Symbol) : self
+      parse(value.to_s)
+    end
+  end
 end

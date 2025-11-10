@@ -34,8 +34,8 @@ module Toon
   # @param indent : Number of spaces per indentation level (default: 2)
   # @param strict : Whether to enable strict validations (currently minimal)
   # @return : Decoded Crystal value
-  def decode(input : String, indent : Int32 = 2, strict : Bool = true, expand_paths : String | Symbol = "off")
-    Decoders.decode_value(input, indent, strict, expand_paths.to_s)
+  def decode(input : String, indent : Int32 = 2, strict : Bool = true, expand_paths : ExpandPathsMode = ExpandPathsMode::Off)
+    Decoders.decode_value(input, indent, strict, expand_paths)
   end
 
   private def resolve_options(indent : Int32, delimiter : String | Char, length_marker : String | Bool, key_folding : String | Symbol, flatten_depth : Int32?)
