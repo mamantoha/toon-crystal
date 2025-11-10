@@ -176,16 +176,6 @@ module FixtureHelper
     end
   end
 
-  # Get length_marker from options
-  def get_length_marker(options : Hash(String, JSON::Any)) : String | Bool
-    if options.has_key?("lengthMarker")
-      marker = options["lengthMarker"].as_s
-      marker.empty? ? false : marker
-    else
-      false
-    end
-  end
-
   # Get keyFolding from options
   def get_key_folding(options : Hash(String, JSON::Any)) : Toon::KeyFoldingMode
     if options.has_key?("keyFolding")
