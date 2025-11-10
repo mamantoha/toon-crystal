@@ -40,13 +40,12 @@ module Toon
 
   private def resolve_options(indent : Int32, delimiter : String | Char, length_marker : String | Bool, key_folding : KeyFoldingMode, flatten_depth : Int32?)
     {
-      indent:        indent,
-      delimiter:     delimiter.to_s,
-      length_marker: length_marker,
+      indent:           indent,
+      delimiter:        delimiter.to_s,
+      length_marker:    length_marker,
       key_folding_mode: key_folding,
-      flatten_depth: flatten_depth,
-      flatten_limit: flatten_depth ? flatten_depth : Int32::MAX,
+      flatten_depth:    flatten_depth,
+      flatten_limit:    flatten_depth ? flatten_depth : Int32::MAX,
     }
   end
-
 end
