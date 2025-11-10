@@ -60,11 +60,11 @@ module Toon
       # Single segment - no folding occurred
       if segments.size == 1
         child_enabled = case reason
-                       when :unfoldable, :limit
-                         false
-                       else
-                         folding_enabled
-                       end
+                        when :unfoldable, :limit
+                          false
+                        else
+                          folding_enabled
+                        end
         return {key, value, child_enabled, nil}
       end
 
