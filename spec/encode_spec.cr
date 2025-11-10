@@ -22,7 +22,6 @@ describe "TOON Encoding Fixtures" do
             # Extract options
             delimiter = FixtureHelper.get_delimiter(options)
             indent = FixtureHelper.get_indent(options)
-            length_marker = FixtureHelper.get_length_marker(options)
             key_folding = FixtureHelper.get_key_folding(options)
             flatten_depth = FixtureHelper.get_flatten_depth(options)
 
@@ -36,7 +35,6 @@ describe "TOON Encoding Fixtures" do
                   input_value,
                   indent: indent,
                   delimiter: delimiter,
-                  length_marker: length_marker,
                   key_folding: key_folding,
                   flatten_depth: flatten_depth
                 )
@@ -46,7 +44,6 @@ describe "TOON Encoding Fixtures" do
                 input_value,
                 indent: indent,
                 delimiter: delimiter,
-                length_marker: length_marker,
                 key_folding: key_folding,
                 flatten_depth: flatten_depth
               )

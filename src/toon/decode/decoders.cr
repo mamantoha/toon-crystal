@@ -801,8 +801,12 @@ module Toon
       close_idx = header_seg.index(']') || (header_seg.size - 1)
       inside = header_seg.byte_slice(1, close_idx - 1)
 
-      length_marker = inside.starts_with?('#')
-      len_and_delim = length_marker ? inside.byte_slice(1) : inside
+      # TOON v2.0: Reject deprecated [#N] length marker format
+      if inside.starts_with?('#')
+        raise DecodeError.new("Length marker format [#N] is no longer supported in TOON v2.0. Use [N] format instead.")
+      end
+
+      len_and_delim = inside
       len_str = len_and_delim
       delim : String? = nil
 

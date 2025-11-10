@@ -139,15 +139,14 @@ module Toon
     end
 
     # Header formatters
-    def format_header(length : Int32, key : String? = nil, fields : Array(String)? = nil, delimiter : String = COMMA.to_s, length_marker : String | Bool = false)
+    def format_header(length : Int32, key : String? = nil, fields : Array(String)? = nil, delimiter : String = COMMA.to_s)
       header = ""
 
       key.try { |k| header += encode_key(k) }
 
       # Only include delimiter if it's not the default (comma)
       delimiter_suffix = delimiter != DEFAULT_DELIMITER.to_s ? delimiter : ""
-      length_prefix = length_marker != false ? length_marker.to_s : ""
-      header += "[#{length_prefix}#{length}#{delimiter_suffix}]"
+      header += "[#{length}#{delimiter_suffix}]"
 
       if fields
         quoted_fields = fields.map { |field| encode_key(field) }
