@@ -72,11 +72,11 @@ module Toon
             raise DecodeError.new("Unterminated escape sequence") if i + 1 >= inner.size
             nxt = inner[i + 1]
             case nxt
-            when 'n'  then io << NEWLINE
-            when 'r'  then io << CARRIAGE_RETURN
-            when 't'  then io << TAB
-            when DOUBLE_QUOTE  then io << DOUBLE_QUOTE
-            when BACKSLASH then io << BACKSLASH
+            when 'n'          then io << NEWLINE
+            when 'r'          then io << CARRIAGE_RETURN
+            when 't'          then io << TAB
+            when DOUBLE_QUOTE then io << DOUBLE_QUOTE
+            when BACKSLASH    then io << BACKSLASH
             else
               raise DecodeError.new("Invalid escape sequence: \\#{nxt}")
             end
