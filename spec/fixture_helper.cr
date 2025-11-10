@@ -187,11 +187,19 @@ module FixtureHelper
   end
 
   # Get keyFolding from options
-  def get_key_folding(options : Hash(String, JSON::Any)) : String
+  def get_key_folding(options : Hash(String, JSON::Any)) : Toon::KeyFoldingMode
     if options.has_key?("keyFolding")
-      options["keyFolding"].as_s
+      value = options["keyFolding"]
+      case value.raw
+      when String
+        Toon::KeyFoldingMode.parse(value.as_s)
+      when Symbol
+        Toon::KeyFoldingMode.parse(value.as_s)
+      else
+        Toon::KeyFoldingMode.parse(value.to_s)
+      end
     else
-      "off"
+      Toon::KeyFoldingMode::Off
     end
   end
 

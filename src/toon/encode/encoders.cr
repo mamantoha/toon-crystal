@@ -135,7 +135,7 @@ module Toon
     end
 
     private def key_folding_safe?(options) : Bool
-      options[:key_folding] == "safe"
+      options[:key_folding_mode].as(KeyFoldingMode).safe?
     end
 
     private def foldable_segment?(segment : String) : Bool

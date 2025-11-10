@@ -52,4 +52,28 @@ module Toon
       parse(value.to_s)
     end
   end
+
+  enum KeyFoldingMode
+    Off
+    Safe
+
+    def safe?
+      self == Safe
+    end
+
+    def self.parse(value : String) : self
+      case value.downcase
+      when "off"
+        Off
+      when "safe"
+        Safe
+      else
+        raise ArgumentError.new("Unknown keyFolding mode: #{value}")
+      end
+    end
+
+    def self.parse(value : Symbol) : self
+      parse(value.to_s)
+    end
+  end
 end
