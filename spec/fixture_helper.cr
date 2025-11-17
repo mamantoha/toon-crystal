@@ -195,14 +195,14 @@ module FixtureHelper
 
   # Get flattenDepth from options (nil means Infinity/default)
   def get_flatten_depth(options : Hash(String, JSON::Any)) : Int32?
-    return nil unless options.has_key?("flattenDepth")
+    return unless options.has_key?("flattenDepth")
 
     value = options["flattenDepth"]
 
     # flattenDepth might be represented as a number or a string ("Infinity")
     if value.raw.is_a?(String)
       str = value.as_s
-      return nil if str.downcase == "infinity"
+      return if str.downcase == "infinity"
       str.to_i32
     else
       value.as_i64.to_i32

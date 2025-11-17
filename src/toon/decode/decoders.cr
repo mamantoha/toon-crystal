@@ -632,7 +632,7 @@ module Toon
 
     private def parse_primitive_token(token : String) : JsonValue
       str = token.strip
-      return nil if str == NULL_LITERAL
+      return if str == NULL_LITERAL
       return true if str == TRUE_LITERAL
       return false if str == FALSE_LITERAL
 
@@ -722,10 +722,10 @@ module Toon
         if quote_end
           # Check if there's a '[' after the quoted section
           after_quote = trimmed.byte_slice(quote_end + 1).lstrip
-          return nil unless after_quote.starts_with?('[')
+          return unless after_quote.starts_with?('[')
         else
           # Unterminated quote, not an array header
-          return nil
+          return
         end
       end
 
@@ -772,13 +772,13 @@ module Toon
       end
 
       # [#?len<opt delim>]...
-      return nil unless rest.starts_with?('[')
+      return unless rest.starts_with?('[')
 
       # find closing bracket
       bracket_start = 0
       bracket_end = rest.index(']', bracket_start)
 
-      return nil unless bracket_end
+      return unless bracket_end
 
       # look for optional fields braces
       search_start = bracket_end + 1
@@ -786,13 +786,13 @@ module Toon
 
       if brace_start
         brace_end = rest.index('}', brace_start)
-        return nil unless brace_end
+        return unless brace_end
         search_start = brace_end + 1
       end
 
       colon_idx = rest.index(':', search_start)
 
-      return nil unless colon_idx
+      return unless colon_idx
 
       header_seg = rest.byte_slice(0, colon_idx)
       tail = rest.byte_slice(colon_idx + 1)

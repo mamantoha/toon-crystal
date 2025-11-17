@@ -43,13 +43,13 @@ module Toon
         # -0.0 becomes 0
         return 0_i64 if value == 0.0 && (1.0 / value) < 0
         # NaN and Infinity become nil
-        return nil unless value.finite?
+        return unless value.finite?
         value.to_f64
       when Float64
         # -0.0 becomes 0
         return 0_i64 if value == 0.0 && (1.0 / value) < 0
         # NaN and Infinity become nil
-        return nil unless value.finite?
+        return unless value.finite?
         value
       when Symbol
         value.to_s

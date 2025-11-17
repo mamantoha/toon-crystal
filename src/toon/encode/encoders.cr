@@ -247,13 +247,13 @@ module Toon
     end
 
     def detect_tabular_header(rows)
-      return nil if rows.empty?
+      return if rows.empty?
 
       first_row = rows[0]
-      return nil unless first_row.is_a?(Hash)
+      return unless first_row.is_a?(Hash)
 
       first_keys = first_row.keys
-      return nil if first_keys.empty?
+      return if first_keys.empty?
 
       if tabular_array?(rows, first_keys)
         first_keys
