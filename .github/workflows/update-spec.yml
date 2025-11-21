@@ -14,6 +14,10 @@ jobs:
       contents: write
       pull-requests: write
     steps:
+      # Note: We use a Personal Access Token (`secrets.UPDATE_SPEC_TOKEN`) here
+      # instead of the default `GITHUB_TOKEN` because GitHub prevents workflows
+      # triggered by the repository `GITHUB_TOKEN` from starting other workflows.
+      # Using a PAT allows the PR created by this workflow to trigger CI/jobs.
       - name: Check out repository code
         uses: actions/checkout@v5
         with:
