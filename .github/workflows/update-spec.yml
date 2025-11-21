@@ -18,7 +18,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           submodules: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.UPDATE_SPEC_TOKEN }}
 
       - name: Get current submodule commit
         id: current_commit
@@ -82,7 +82,7 @@ jobs:
         if: steps.check_update.outputs.has_update == 'true'
         uses: peter-evans/create-pull-request@v7
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.UPDATE_SPEC_TOKEN }}
           branch: update-spec-${{ github.run_id }}
           commit-message: |
             chore: update spec submodule${{ steps.check_update.outputs.latest_tag && format(' to {0}', steps.check_update.outputs.latest_tag) || format(' to {0}', steps.check_update.outputs.latest_commit) }}
