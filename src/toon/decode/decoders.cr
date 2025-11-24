@@ -863,8 +863,6 @@ module Toon
       key_value_line?(after_hyphen)
     end
 
-    # no longer used
-
     private def parse_delimited_values(values_str : String, delimiter : String) : Array(String)
       result = [] of String
       return result if values_str.empty?

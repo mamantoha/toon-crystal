@@ -286,6 +286,35 @@ module Toon
       end
     end
 
+    private def emit_tabular_header_and_rows(writer : LineWriter, header_depth : Int32, row_depth : Int32, key : String?, rows : Array, header : Array(String), options, include_list_prefix : Bool = false)
+      header_str = Primitives.format_header(rows.size, key: key, fields: header, delimiter: options[:delimiter])
+
+      if include_list_prefix
+        writer.push(header_depth, "#{LIST_ITEM_PREFIX}#{header_str}")
+      else
+        writer.push(header_depth, header_str)
+      end
+
+      write_tabular_rows(rows, header, writer, row_depth, options)
+    end
+
+    private def try_emit_compact_array_list_item(writer : LineWriter, depth : Int32, key : String?, arr : Array, options) : Bool
+      if Normalizer.array_of_primitives?(arr)
+        formatted = format_inline_array(arr, options[:delimiter], key)
+        writer.push(depth, "#{LIST_ITEM_PREFIX}#{formatted}")
+        return true
+      elsif Normalizer.array_of_objects?(arr)
+        header = detect_tabular_header(arr)
+
+        if header
+          emit_tabular_header_and_rows(writer, depth, depth + 2, key, arr, header, options, true)
+          return true
+        end
+      end
+
+      false
+    end
+
     # Array of objects (expanded format)
     def encode_mixed_array_as_list_items(key : String?, items : Array, writer : LineWriter, depth : Int32, options, folding_enabled : Bool = folding_enabled?(options))
       header = Primitives.format_header(items.size, key: key, delimiter: options[:delimiter])
@@ -337,21 +366,10 @@ module Toon
         folded_key, folded_value, child_enabled, child_limit = maybe_fold_key(only_key, raw, obj, options, folding_enabled, chain_limit)
 
         if folded_value.is_a?(Array)
-          arr = folded_value
+          arr = folded_value.as(Array)
 
-          if Normalizer.array_of_primitives?(arr)
-            formatted = format_inline_array(arr, options[:delimiter], folded_key)
-            writer.push(depth, "#{LIST_ITEM_PREFIX}#{formatted}")
+          if try_emit_compact_array_list_item(writer, depth, folded_key, arr, options)
             return
-          elsif Normalizer.array_of_objects?(arr)
-            header = detect_tabular_header(arr)
-
-            if header
-              header_str = Primitives.format_header(arr.size, key: folded_key, fields: header, delimiter: options[:delimiter])
-              writer.push(depth, "#{LIST_ITEM_PREFIX}#{header_str}")
-              write_tabular_rows(arr, header, writer, depth + 2, options)
-              return
-            end
           end
         end
       end
@@ -367,20 +385,10 @@ module Toon
       elsif first_value.is_a?(Array)
         arr = first_value
 
-        if Normalizer.array_of_primitives?(arr)
-          # Inline format for primitive arrays
-          formatted = format_inline_array(arr, options[:delimiter], folded_first_key)
-          writer.push(depth, "#{LIST_ITEM_PREFIX}#{formatted}")
-        elsif Normalizer.array_of_objects?(arr)
-          # Check if array of objects can use tabular format
-          header = detect_tabular_header(arr)
-
-          if header
-            # Tabular format for uniform arrays of objects
-            header_str = Primitives.format_header(arr.size, key: folded_first_key, fields: header, delimiter: options[:delimiter])
-            writer.push(depth, "#{LIST_ITEM_PREFIX}#{header_str}")
-            write_tabular_rows(arr, header, writer, depth + 2, options)
-          else
+        if try_emit_compact_array_list_item(writer, depth, folded_first_key, arr, options)
+          # compact form emitted
+        else
+          if Normalizer.array_of_objects?(arr)
             # Fall back to list format for non-uniform arrays of objects
             writer.push(depth, "#{LIST_ITEM_PREFIX}#{encoded_key}[#{arr.size}]:")
 
@@ -389,20 +397,20 @@ module Toon
                 encode_object_as_list_item(item.as(Hash(String, Decoders::JsonValue)), writer, depth + 2, options, first_child_enabled)
               end
             end
-          end
-        else
-          # Complex arrays on separate lines (array of arrays, etc.)
-          writer.push(depth, "#{LIST_ITEM_PREFIX}#{encoded_key}[#{arr.size}]:")
+          else
+            # Complex arrays on separate lines (array of arrays, etc.)
+            writer.push(depth, "#{LIST_ITEM_PREFIX}#{encoded_key}[#{arr.size}]:")
 
-          # Encode array contents at depth + 2 (header printed on hyphen line)
-          arr.each do |item|
-            if Normalizer.json_primitive?(item)
-              writer.push(depth + 2, "#{LIST_ITEM_PREFIX}#{Primitives.encode_primitive(item, options[:delimiter])}")
-            elsif item.is_a?(Array) && Normalizer.array_of_primitives?(item)
-              inline = format_inline_array(item, options[:delimiter], nil)
-              writer.push(depth + 2, "#{LIST_ITEM_PREFIX}#{inline}")
-            elsif item.is_a?(Hash)
-              encode_object_as_list_item(item.as(Hash(String, Decoders::JsonValue)), writer, depth + 2, options, first_child_enabled)
+            # Encode array contents at depth + 2 (header printed on hyphen line)
+            arr.each do |item|
+              if Normalizer.json_primitive?(item)
+                writer.push(depth + 2, "#{LIST_ITEM_PREFIX}#{Primitives.encode_primitive(item, options[:delimiter])}")
+              elsif item.is_a?(Array) && Normalizer.array_of_primitives?(item)
+                inline = format_inline_array(item, options[:delimiter], nil)
+                writer.push(depth + 2, "#{LIST_ITEM_PREFIX}#{inline}")
+              elsif item.is_a?(Hash)
+                encode_object_as_list_item(item.as(Hash(String, Decoders::JsonValue)), writer, depth + 2, options, first_child_enabled)
+              end
             end
           end
         end
