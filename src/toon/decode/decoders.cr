@@ -403,12 +403,23 @@ module Toon
         return {} of String => JsonValue
       end
 
-      # Only treat as header when list item starts directly with '[' (no key)
+      # Only treat as header when list item starts directly with '[' (no key).
+      # Pass an increased base depth so nested rows are parsed at the deeper
+      # indentation level used when the header is on the hyphen line.
       if after_hyphen.lstrip.starts_with?('[')
         if parsed = parse_array_header_line(after_hyphen)
           header, inline_values = parsed
 
-          return decode_array_from_header(header, inline_values, cursor, base_depth, delimiter, strict, expand_paths)
+          # If the header includes a key (e.g., "users[2]{...}:" on the hyphen
+          # line) then rows are expected at base_depth + 2, so pass an
+          # increased base_depth. For bare array headers (no key) the nested
+          # items are list items at base_depth + 1, so pass the unchanged
+          # base_depth.
+          if header.key
+            return decode_array_from_header(header, inline_values, cursor, base_depth + 1, delimiter, strict, expand_paths)
+          else
+            return decode_array_from_header(header, inline_values, cursor, base_depth, delimiter, strict, expand_paths)
+          end
         end
       end
 
@@ -421,7 +432,10 @@ module Toon
 
     private def decode_object_from_list_item(first_line : ParsedLine, cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool, expand_paths : ExpandPathsMode) : Hash(String, JsonValue)
       after_hyphen = first_line.content.byte_slice(LIST_ITEM_PREFIX.size)
-      key_token, value, _follow = decode_key_value(after_hyphen, cursor, base_depth, delimiter, strict, expand_paths)
+      # When decoding the first field of a list-item object, treat array headers
+      # as if they are nested one level deeper (the hyphen line contains the
+      # header), so pass an increased base depth to `decode_key_value`.
+      key_token, value, _follow = decode_key_value(after_hyphen, cursor, base_depth + 1, delimiter, strict, expand_paths)
       obj = {} of String => JsonValue
       insert_key!(obj, key_token, value, strict, expand_paths)
 
