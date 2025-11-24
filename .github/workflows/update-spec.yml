@@ -19,7 +19,7 @@ jobs:
       # triggered by the repository `GITHUB_TOKEN` from starting other workflows.
       # Using a PAT allows the PR created by this workflow to trigger CI/jobs.
       - name: Check out repository code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           submodules: true
           token: ${{ secrets.UPDATE_SPEC_TOKEN }}
