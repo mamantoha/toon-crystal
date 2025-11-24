@@ -384,8 +384,15 @@ module Toon
 
       raise DecodeError.new("Expected list item") unless line
 
-      # Handle both "- " and "-" (empty item)
+      # Handle both "- " and "-" (empty item). If the hyphen is alone but
+      # followed by indented fields, treat it as the start of an object and
+      # decode the nested object at the subsequent depth.
       if line.content == "-"
+        next_line = cursor.peek
+        if next_line && next_line.depth > base_depth
+          return decode_object(cursor, next_line.depth, delimiter, strict, expand_paths)
+        end
+
         return {} of String => JsonValue
       end
 

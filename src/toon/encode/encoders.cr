@@ -328,69 +328,38 @@ module Toon
         return
       end
 
-      # First key-value on the same line as "- "
-      first_key = keys.first
-      folded_first_key, folded_first_value, first_child_enabled, first_child_limit = maybe_fold_key(first_key, obj[first_key], obj, options, folding_enabled, chain_limit)
-      encoded_key = Primitives.encode_key(folded_first_key)
-      first_value = folded_first_value
+      # Special-case: single-field objects whose value is an inline-able array
+      # (primitive array or tabular object array) should use the compact form on
+      # the same hyphen line (e.g., "- key[2]: 1,2" or "- key[2]{a,b}:\n  1,2").
+      if keys.size == 1
+        only_key = keys.first
+        raw = obj[only_key]
+        folded_key, folded_value, child_enabled, child_limit = maybe_fold_key(only_key, raw, obj, options, folding_enabled, chain_limit)
 
-      if Normalizer.json_primitive?(first_value)
-        writer.push(depth, "#{LIST_ITEM_PREFIX}#{encoded_key}: #{Primitives.encode_primitive(first_value, options[:delimiter])}")
-      elsif first_value.is_a?(Array)
-        arr = first_value
+        if folded_value.is_a?(Array)
+          arr = folded_value
 
-        if Normalizer.array_of_primitives?(arr)
-          # Inline format for primitive arrays
-          formatted = format_inline_array(arr, options[:delimiter], folded_first_key)
-          writer.push(depth, "#{LIST_ITEM_PREFIX}#{formatted}")
-        elsif Normalizer.array_of_objects?(arr)
-          # Check if array of objects can use tabular format
-          header = detect_tabular_header(arr)
+          if Normalizer.array_of_primitives?(arr)
+            formatted = format_inline_array(arr, options[:delimiter], folded_key)
+            writer.push(depth, "#{LIST_ITEM_PREFIX}#{formatted}")
+            return
+          elsif Normalizer.array_of_objects?(arr)
+            header = detect_tabular_header(arr)
 
-          if header
-            # Tabular format for uniform arrays of objects
-            header_str = Primitives.format_header(arr.size, key: folded_first_key, fields: header, delimiter: options[:delimiter])
-            writer.push(depth, "#{LIST_ITEM_PREFIX}#{header_str}")
-            write_tabular_rows(arr, header, writer, depth + 1, options)
-          else
-            # Fall back to list format for non-uniform arrays of objects
-            writer.push(depth, "#{LIST_ITEM_PREFIX}#{encoded_key}[#{arr.size}]:")
-
-            arr.each do |item|
-              if item.is_a?(Hash)
-                encode_object_as_list_item(item.as(Hash(String, Decoders::JsonValue)), writer, depth + 1, options, first_child_enabled)
-              end
+            if header
+              header_str = Primitives.format_header(arr.size, key: folded_key, fields: header, delimiter: options[:delimiter])
+              writer.push(depth, "#{LIST_ITEM_PREFIX}#{header_str}")
+              write_tabular_rows(arr, header, writer, depth + 1, options)
+              return
             end
           end
-        else
-          # Complex arrays on separate lines (array of arrays, etc.)
-          writer.push(depth, "#{LIST_ITEM_PREFIX}#{encoded_key}[#{arr.size}]:")
-
-          # Encode array contents at depth + 1
-          arr.each do |item|
-            if Normalizer.json_primitive?(item)
-              writer.push(depth + 1, "#{LIST_ITEM_PREFIX}#{Primitives.encode_primitive(item, options[:delimiter])}")
-            elsif item.is_a?(Array) && Normalizer.array_of_primitives?(item)
-              inline = format_inline_array(item, options[:delimiter], nil)
-              writer.push(depth + 1, "#{LIST_ITEM_PREFIX}#{inline}")
-            elsif item.is_a?(Hash)
-              encode_object_as_list_item(item.as(Hash(String, Decoders::JsonValue)), writer, depth + 1, options, first_child_enabled)
-            end
-          end
-        end
-      elsif first_value.is_a?(Hash)
-        nested_keys = first_value.keys
-
-        if nested_keys.empty?
-          writer.push(depth, "#{LIST_ITEM_PREFIX}#{encoded_key}:")
-        else
-          writer.push(depth, "#{LIST_ITEM_PREFIX}#{encoded_key}:")
-          encode_object(first_value.as(Hash(String, Decoders::JsonValue)), writer, depth + 2, options, first_child_enabled, first_child_limit)
         end
       end
 
-      # Remaining keys on indented lines
-      keys[1..].each do |key|
+      # Emit a bare hyphen for the list item then encode all keys indented beneath it.
+      writer.push(depth, LIST_ITEM_MARKER.to_s)
+
+      keys.each do |key|
         raw = obj[key]
         folded_key, folded_value, child_enabled, child_limit = maybe_fold_key(key, raw, obj, options, folding_enabled, chain_limit)
         emit_key_value_pair(folded_key, folded_value, writer, depth + 1, options, child_enabled, child_limit)
