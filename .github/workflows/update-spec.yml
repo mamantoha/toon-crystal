@@ -84,7 +84,7 @@ jobs:
 
       - name: Create Pull Request
         if: steps.check_update.outputs.has_update == 'true'
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.UPDATE_SPEC_TOKEN }}
           branch: update-spec-${{ github.run_id }}
