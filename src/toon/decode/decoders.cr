@@ -61,7 +61,7 @@ module Toon
   module Decoders
     extend self
 
-    alias JsonValue = (Nil | Bool | Int64 | Float64 | String | Array(JsonValue) | Hash(String, JsonValue))
+    alias JsonValue = Bool | Int64 | Float64 | String | Array(JsonValue) | Hash(String, JsonValue)?
 
     IDENTIFIER_SEGMENT_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/
 
