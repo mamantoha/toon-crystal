@@ -82,8 +82,23 @@ jobs:
           cd ../..
           git add ext/spec
 
-      - name: Create Pull Request
+      - name: Check for existing PR for this commit
         if: steps.check_update.outputs.has_update == 'true'
+        id: check_existing_pr
+        env:
+          GH_TOKEN: ${{ secrets.UPDATE_SPEC_TOKEN }}
+        run: |
+          LATEST_COMMIT="${{ steps.check_update.outputs.latest_commit }}"
+          # Search for open PRs with this commit in the title
+          PR_EXISTS=$(gh pr list --state open --search "$LATEST_COMMIT in:title" --json title | jq '.[].title' | grep "$LATEST_COMMIT" || true)
+          if [ -n "$PR_EXISTS" ]; then
+            echo "pr_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "pr_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Pull Request
+        if: steps.check_update.outputs.has_update == 'true' && steps.check_existing_pr.outputs.pr_exists == 'false'
         uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.UPDATE_SPEC_TOKEN }}
