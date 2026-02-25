@@ -801,19 +801,27 @@ module Toon
 
       return unless bracket_end
 
-      # look for optional fields braces
-      search_start = bracket_end + 1
-      brace_start = rest.index('{', bracket_end)
-
-      if brace_start
-        brace_end = rest.index('}', brace_start)
-        return unless brace_end
-        search_start = brace_end + 1
+      # Optional fields braces must appear immediately after optional whitespace
+      # following the closing bracket. Any other token means this is not an
+      # array header and should be treated as a normal key.
+      cursor = bracket_end + 1
+      while cursor < rest.size && rest[cursor].ascii_whitespace?
+        cursor += 1
       end
 
-      colon_idx = rest.index(':', search_start)
+      if cursor < rest.size && rest[cursor] == '{'
+        brace_end = rest.index('}', cursor)
+        return unless brace_end
+        cursor = brace_end + 1
+      end
 
-      return unless colon_idx
+      while cursor < rest.size && rest[cursor].ascii_whitespace?
+        cursor += 1
+      end
+
+      return unless cursor < rest.size && rest[cursor] == ':'
+
+      colon_idx = cursor
 
       header_seg = rest.byte_slice(0, colon_idx)
       tail = rest.byte_slice(colon_idx + 1)
@@ -836,7 +844,10 @@ module Toon
         end
       end
 
-      length = len_str.strip.to_i
+      len_str = len_str.strip
+      return unless len_str =~ /^\d+$/
+      length = len_str.to_i?
+      return unless length
 
       fields : Array(String)? = nil
       brace_idx = header_seg.index('{')
