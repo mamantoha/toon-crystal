@@ -71,12 +71,31 @@ module Toon
     end
 
     def escape_string(value : String)
-      value
-        .gsub("\\", "\\\\")
-        .gsub("\"", "\\\"")
-        .gsub("\n", "\\n")
-        .gsub("\r", "\\r")
-        .gsub("\t", "\\t")
+      String.build do |io|
+        value.each_char do |ch|
+          case ch
+          when '\\'
+            io << "\\\\"
+          when '"'
+            io << "\\\""
+          when '\n'
+            io << "\\n"
+          when '\r'
+            io << "\\r"
+          when '\t'
+            io << "\\t"
+          else
+            code = ch.ord
+
+            if code <= 0x1F
+              io << "\\u"
+              io << code.to_s(16).rjust(4, '0')
+            else
+              io << ch
+            end
+          end
+        end
+      end
     end
 
     def safe_unquoted?(value : String, delimiter : String = COMMA.to_s)
@@ -87,7 +106,7 @@ module Toon
       return false if value.includes?(COLON)
       return false if value.includes?(DOUBLE_QUOTE) || value.includes?('\\')
       return false if value =~ /[\[\]{}]/
-      return false if value =~ /[\n\r\t]/
+      return false if value =~ /[\x00-\x1F]/
       return false if value.includes?(delimiter)
       return false if value.starts_with?(LIST_ITEM_MARKER.to_s)
 
@@ -118,7 +137,7 @@ module Toon
 
     def valid_unquoted_key?(key : String)
       # Keys must not contain control characters or special characters
-      return false if key =~ /[\n\r\t]/
+      return false if key =~ /[\x00-\x1F]/
       return false if key.includes?(COLON)
       return false if key.includes?(DOUBLE_QUOTE) || key.includes?('\\')
       return false if key =~ /[\[\]{}]/

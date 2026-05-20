@@ -145,6 +145,10 @@ module Toon
       # Empty document decodes to empty object
       return {} of String => JsonValue unless first
 
+      if cursor.length == 1 && first.content.strip == "[]"
+        return [] of JsonValue
+      end
+
       if parsed = parse_array_header_line(first.content)
         header, inline_values = parsed
 
@@ -211,6 +215,8 @@ module Toon
     end
 
     private def decode_key_value(content : String, cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool, expand_paths : ExpandPathsMode) : {KeyToken, JsonValue, Int32}
+      validate_malformed_array_header_strict!(content, strict)
+
       # Array header with key
       if parsed = parse_array_header_line(content)
         header, inline_values = parsed
@@ -240,6 +246,10 @@ module Toon
 
       key_token, rest = parse_key_token(content)
       rest = rest.strip
+
+      if rest == "[]"
+        return {key_token, [] of JsonValue, base_depth + 1}
+      end
 
       if rest.empty?
         next_line = cursor.peek
@@ -718,6 +728,22 @@ module Toon
             when 't'  then io << '\t'
             when '"'  then io << '"'
             when '\\' then io << '\\'
+            when 'u'
+              raise DecodeError.new("Invalid unicode escape sequence") if i + 5 >= inner.size
+
+              hex = inner[i + 2, 4]
+              unless hex =~ /^[0-9a-fA-F]{4}$/
+                raise DecodeError.new("Invalid unicode escape sequence")
+              end
+
+              codepoint = hex.to_i(16)
+              if codepoint >= 0xD800 && codepoint <= 0xDFFF
+                raise DecodeError.new("Invalid unicode escape sequence")
+              end
+
+              io << codepoint.chr
+              i += 6
+              next
             else
               raise DecodeError.new("Invalid escape sequence: \\#{nxt}")
             end
@@ -729,6 +755,54 @@ module Toon
         end
       end
       result
+    end
+
+    private def validate_malformed_array_header_strict!(content : String, strict : Bool)
+      return unless strict
+
+      colon_idx = find_unquoted_colon_index(content)
+      return unless colon_idx
+
+      header_part = content[0, colon_idx]
+
+      bracket_idx = find_unquoted_char_index(header_part, '[')
+      return unless bracket_idx
+
+      close_idx = header_part.index(']', bracket_idx + 1)
+      return unless close_idx
+
+      inside = header_part[bracket_idx + 1, close_idx - bracket_idx - 1].strip
+      return unless inside =~ /^\d+([,\t|])?$/
+
+      suffix = header_part[close_idx + 1, header_part.size - (close_idx + 1)].strip
+      return if suffix.empty?
+      return if suffix.starts_with?('{') && suffix.ends_with?('}')
+
+      raise DecodeError.new("Invalid array header syntax")
+    end
+
+    private def find_unquoted_char_index(content : String, target : Char) : Int32?
+      i = 0
+      in_quotes = false
+      escaped = false
+
+      while i < content.size
+        ch = content[i]
+
+        if in_quotes
+          if !escaped && ch == '"'
+            in_quotes = false
+          end
+          escaped = (!escaped && ch == '\\')
+        else
+          return i if ch == target
+          in_quotes = true if ch == '"'
+        end
+
+        i += 1
+      end
+
+      nil
     end
 
     private def parse_array_header_line(content : String) : {ArrayHeader, String?}?

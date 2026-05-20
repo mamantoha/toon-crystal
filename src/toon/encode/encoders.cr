@@ -166,8 +166,11 @@ module Toon
     # Array encoding
     def encode_array(key : String?, value : Array, writer : LineWriter, depth : Int32, options, folding_enabled : Bool = folding_enabled?(options))
       if value.empty?
-        header = Primitives.format_header(0, key: key, delimiter: options[:delimiter])
-        writer.push(depth, header)
+        if key
+          writer.push(depth, "#{Primitives.encode_key(key)}: []")
+        else
+          writer.push(depth, "[]")
+        end
 
         return
       end
@@ -300,8 +303,12 @@ module Toon
 
     private def try_emit_compact_array_list_item(writer : LineWriter, depth : Int32, key : String?, arr : Array, options) : Bool
       if Normalizer.array_of_primitives?(arr)
-        formatted = format_inline_array(arr, options[:delimiter], key)
-        writer.push(depth, "#{LIST_ITEM_PREFIX}#{formatted}")
+        if arr.empty? && key
+          writer.push(depth, "#{LIST_ITEM_PREFIX}#{Primitives.encode_key(key)}: []")
+        else
+          formatted = format_inline_array(arr, options[:delimiter], key)
+          writer.push(depth, "#{LIST_ITEM_PREFIX}#{formatted}")
+        end
         return true
       elsif Normalizer.array_of_objects?(arr)
         header = detect_tabular_header(arr)
