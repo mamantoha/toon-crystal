@@ -431,6 +431,10 @@ module Toon
     end
 
     private def assign_key!(obj : Hash(String, JsonValue), key : String, value : JsonValue, strict : Bool, expand_paths : ExpandPathsMode, path : String)
+      if strict && obj.has_key?(key)
+        raise DecodeError.new("Duplicate key '#{path}'")
+      end
+
       if expand_paths.safe? && obj.has_key?(key)
         existing = obj[key]
 
@@ -545,14 +549,38 @@ module Toon
       close_idx = header_part.index(']', bracket_idx + 1)
       return unless close_idx
 
-      inside = header_part[bracket_idx + 1, close_idx - bracket_idx - 1].strip
-      return unless inside =~ /^\d+([,\t|])?$/
+      inside = header_part[bracket_idx + 1, close_idx - bracket_idx - 1]
+      suffix = header_part[close_idx + 1, header_part.size - (close_idx + 1)]
 
-      suffix = header_part[close_idx + 1, header_part.size - (close_idx + 1)].strip
-      return if suffix.empty?
-      return if suffix.starts_with?('{') && suffix.ends_with?('}')
+      if suffix.empty?
+        validate_array_header_bracket_segment!(inside)
+        return
+      end
+
+      if suffix.starts_with?('{') && suffix.ends_with?('}')
+        validate_array_header_bracket_segment!(inside)
+        return
+      end
 
       raise DecodeError.new("Invalid array header syntax")
+    end
+
+    private def validate_array_header_bracket_segment!(segment : String)
+      len_str = segment
+
+      if len_str.size > 0
+        last = len_str[-1]
+
+        if delimiter_char?(last)
+          len_str = len_str.byte_slice(0, len_str.size - 1)
+        elsif !last.ascii_number?
+          raise DecodeError.new("Invalid array header syntax")
+        end
+      end
+
+      unless len_str =~ /^(0|[1-9]\d*)$/
+        raise DecodeError.new("Invalid array header syntax")
+      end
     end
 
     private def object_field_after_hyphen?(after_hyphen : String) : Bool
