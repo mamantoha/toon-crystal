@@ -133,17 +133,17 @@ module Toon
       delim : String? = nil
 
       if len_and_delim.size > 0
-        # if last char is a non-digit, treat as delimiter override
+        # if last char is a delimiter override, separate it from the length
         last = len_and_delim[-1]
 
-        if !(last.ascii_number?)
+        if delimiter_char?(last)
           delim = last.to_s
           len_str = len_and_delim.byte_slice(0, len_and_delim.size - 1)
         end
       end
 
       len_str = len_str.strip
-      return unless len_str =~ /^\d+$/
+      return unless len_str =~ /^(0|[1-9]\d*)$/
       length = len_str.to_i?
       return unless length
 
@@ -166,6 +166,10 @@ module Toon
 
       inline_values = tail.strip.empty? ? nil : tail.strip
       {header, inline_values}
+    end
+
+    private def delimiter_char?(ch : Char) : Bool
+      ch == COMMA || ch == TAB || ch == PIPE
     end
   end
 end
