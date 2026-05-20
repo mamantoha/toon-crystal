@@ -22,6 +22,7 @@ Run `crystal spec` after each step to verify.
   - Removes ~55 lines of duplicated code
 
 - [ ] **Step 4** — Move `ParsedLine` and `LineCursor` to their own file
+- [x] **Step 4** — Move `ParsedLine` and `LineCursor` to their own file
   - Create `src/toon/decode/line_cursor.cr` with `struct ParsedLine` and `class LineCursor`
   - Replace definitions in `decoders.cr` with `require "./line_cursor"`
 
