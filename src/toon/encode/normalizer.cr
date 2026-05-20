@@ -66,31 +66,6 @@ module Toon
     end
 
     private def normalize_array(array : Array) : JsonValue
-      # Handle JsonValue arrays explicitly
-      if array.is_a?(Array(JsonValue))
-        result = [] of JsonValue
-        array.each do |v|
-          normalized = normalize_value(v)
-          # Convert to JsonValue-compatible type
-          case normalized
-          when JsonValue
-            result << normalized
-          when Int32
-            result << normalized.to_i64
-          when Float32
-            result << normalized.to_f64
-          when Array
-            result << normalize_array(normalized).as(JsonValue)
-          when Hash
-            result << normalize_hash(normalized).as(JsonValue)
-          else
-            result << normalized.as(JsonValue)
-          end
-        end
-        return result.as(JsonValue)
-      end
-
-      # For other arrays, normalize and cast to JsonValue
       result = [] of JsonValue
       array.each do |v|
         normalized = normalize_value(v)
@@ -113,31 +88,6 @@ module Toon
     end
 
     private def normalize_hash(hash : Hash) : JsonValue
-      # Handle JsonValue hashes explicitly
-      if hash.is_a?(Hash(String, JsonValue))
-        result = {} of String => JsonValue
-        hash.each do |k, v|
-          normalized = normalize_value(v)
-          # Convert to JsonValue-compatible type
-          case normalized
-          when JsonValue
-            result[k.to_s] = normalized
-          when Int32
-            result[k.to_s] = normalized.to_i64
-          when Float32
-            result[k.to_s] = normalized.to_f64
-          when Array
-            result[k.to_s] = normalize_array(normalized).as(JsonValue)
-          when Hash
-            result[k.to_s] = normalize_hash(normalized).as(JsonValue)
-          else
-            result[k.to_s] = normalized.as(JsonValue)
-          end
-        end
-        return result.as(JsonValue)
-      end
-
-      # For other hashes, normalize and cast to JsonValue
       result = {} of String => JsonValue
       hash.each do |k, v|
         normalized = normalize_value(v)

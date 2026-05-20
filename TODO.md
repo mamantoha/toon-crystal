@@ -16,7 +16,7 @@ Run `crystal spec` after each step to verify.
   - Replace all `options[:xxx].as(...)` accesses in `encoders.cr` with typed `options.xxx`
   - Remove `flatten_limit` and `folding_enabled?` helpers from `Encoders` (absorbed by the struct)
 
-- [ ] **Step 3** — Collapse duplicate normalization branches
+- [x] **Step 3** — Collapse duplicate normalization branches
   - In `src/toon/encode/normalizer.cr`, remove the `if array.is_a?(Array(JsonValue)) ... else ...` guard in `normalize_array` — keep one loop body
   - Same collapse for `normalize_hash`
   - Removes ~55 lines of duplicated code
