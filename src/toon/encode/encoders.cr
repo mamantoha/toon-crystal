@@ -8,6 +8,20 @@ module Toon
   module Encoders
     extend self
 
+    private struct FoldChain
+      getter segments : Array(String)
+      getter leaf_value : JsonValue
+      getter stop : Symbol
+      getter collision_key : String?
+
+      def initialize(@segments : Array(String), @leaf_value : JsonValue, @stop : Symbol, @collision_key : String? = nil)
+      end
+
+      def folded_key : String
+        segments.join('.')
+      end
+    end
+
     # Encode normalized value
     def encode_value(value, options : EncodeOptions)
       if Normalizer.json_primitive?(value)
@@ -43,13 +57,30 @@ module Toon
       return {key, value, false, nil} if limit < 2
       return {key, value, folding_enabled, nil} unless foldable_segment?(key)
 
+      chain = walk_fold_chain(key, value, parent, limit)
+      folded_key = chain.folded_key
+
+      if chain.segments.size == 1 && chain.stop == :unfoldable
+        return {key, value, folding_enabled, nil}
+      end
+
+      if chain.collision_key && parent.has_key?(chain.collision_key)
+        return {key, value, false, nil}
+      end
+
+      child_enabled, child_limit = child_fold_options(chain, limit, folding_enabled)
+      {folded_key, chain.leaf_value, child_enabled, child_limit}
+    end
+
+    private def walk_fold_chain(key : String, value : JsonValue, parent : Hash(String, JsonValue), limit : Int32) : FoldChain
       segments = [key]
       current_value = value
-      reason = :start
+      stop : Symbol = :start
+      collision_key : String? = nil
 
       while segments.size < limit
         unless current_value.is_a?(Hash(String, JsonValue))
-          reason = :leaf
+          stop = :leaf
           break
         end
 
@@ -57,13 +88,13 @@ module Toon
         child_keys = child_hash.keys
 
         if child_keys.size != 1
-          reason = :branch
+          stop = :branch
           break
         end
 
         next_key = child_keys.first
         unless foldable_segment?(next_key)
-          reason = :unfoldable
+          stop = :unfoldable
           break
         end
 
@@ -71,45 +102,47 @@ module Toon
         folded_candidate = candidate_segments.join('.')
 
         if parent.has_key?(folded_candidate)
-          return {key, value, false, nil}
+          stop = :unfoldable
+          collision_key = folded_candidate
+          break
         end
 
         segments << next_key
         current_value = child_hash[next_key]
-        reason = :continued
+        stop = :continued
       end
 
       if segments.size == limit && current_value.is_a?(Hash(String, JsonValue))
-        reason = :limit
+        stop = :limit
       end
 
-      if segments.size == 1
-        child_enabled =
-          case reason
-          when :unfoldable, :limit
-            false
-          else
-            folding_enabled
-          end
+      FoldChain.new(segments, current_value, stop, collision_key)
+    end
 
-        return {key, value, child_enabled, nil}
-      end
-
-      # Heuristic: avoid folding two-segment chains when parent has multiple keys
-      folded_key = segments.join('.')
-
+    private def child_fold_options(chain : FoldChain, limit : Int32, folding_enabled : Bool) : {Bool, Int32?}
       child_enabled = folding_enabled
       child_limit : Int32? = nil
 
-      if current_value.is_a?(Hash(String, JsonValue))
-        case reason
+      if chain.segments.size == 1
+        case chain.stop
+        when :unfoldable, :limit
+          child_enabled = false
+        else
+          child_enabled = folding_enabled
+        end
+
+        return {child_enabled, nil}
+      end
+
+      if chain.leaf_value.is_a?(Hash(String, JsonValue))
+        case chain.stop
         when :limit, :unfoldable
           child_enabled = false
         when :branch
           child_enabled = folding_enabled
           child_limit = nil
         else
-          remaining = limit - segments.size
+          remaining = limit - chain.segments.size
 
           if remaining >= 2
             child_limit = remaining
@@ -122,7 +155,7 @@ module Toon
         child_limit = nil
       end
 
-      {folded_key, current_value, child_enabled, child_limit}
+      {child_enabled, child_limit}
     end
 
     private def foldable_segment?(segment : String) : Bool

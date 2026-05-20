@@ -35,7 +35,7 @@ Run `crystal spec` after each step to verify.
   - Move `struct KeyToken`, `struct ArrayHeader`, and `parse_array_header_line` from `decoders.cr`
   - Add `require "./array_header_parser"` to `decoders.cr`
 
-- [ ] **Step 7** — Refactor `maybe_fold_key` in `encoders.cr`
+- [x] **Step 7** — Refactor `maybe_fold_key` in `encoders.cr`
   - Introduce private `struct FoldChain` with `segments`, `leaf_value`, `stop` (`:leaf | :branch | :limit | :unfoldable`)
   - Extract `walk_fold_chain(...)` → `FoldChain` (phase 1: walk the chain)
   - Extract `child_fold_options(chain, limit, enabled)` → `{Bool, Int32?}` (phase 2: decide options)
