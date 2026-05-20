@@ -41,6 +41,6 @@ Run `crystal spec` after each step to verify.
   - Extract `child_fold_options(chain, limit, enabled)` → `{Bool, Int32?}` (phase 2: decide options)
   - Reduce `maybe_fold_key` to a thin coordinator calling both
 
-- [ ] **Step 8** — Add internal unit specs
+- [x] **Step 8** — Add internal unit specs
   - Create `spec/internal/string_parser_spec.cr` — unit tests for `parse_primitive_token`, `parse_string_literal`
   - Create `spec/internal/array_header_parser_spec.cr` — unit tests for `parse_array_header_line`

@@ -555,7 +555,6 @@ module Toon
       raise DecodeError.new("Invalid array header syntax")
     end
 
-
     private def object_field_after_hyphen?(after_hyphen : String) : Bool
       key_value_line?(after_hyphen)
     end

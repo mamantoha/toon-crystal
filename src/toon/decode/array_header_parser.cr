@@ -25,7 +25,7 @@ module Toon
       end
 
       def key_quoted? : Bool
-        @key_token.try(&.quoted) || false
+        @key_token.try(&.quoted?) || false
       end
     end
 
