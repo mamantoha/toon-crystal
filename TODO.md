@@ -21,7 +21,6 @@ Run `crystal spec` after each step to verify.
   - Same collapse for `normalize_hash`
   - Removes ~55 lines of duplicated code
 
-- [ ] **Step 4** — Move `ParsedLine` and `LineCursor` to their own file
 - [x] **Step 4** — Move `ParsedLine` and `LineCursor` to their own file
   - Create `src/toon/decode/line_cursor.cr` with `struct ParsedLine` and `class LineCursor`
   - Replace definitions in `decoders.cr` with `require "./line_cursor"`
@@ -31,7 +30,7 @@ Run `crystal spec` after each step to verify.
   - Move these methods from `decoders.cr`: `parse_string_literal`, `parse_primitive_token`, `parse_delimited_values`, `find_unquoted_colon_index`, `find_unquoted_char_index`, `key_value_line?`
   - Add `require "./string_parser"` to `decoders.cr`
 
-- [ ] **Step 6** — Extract array header parsing to dedicated file
+- [x] **Step 6** — Extract array header parsing to dedicated file
   - Create `src/toon/decode/array_header_parser.cr`
   - Move `struct KeyToken`, `struct ArrayHeader`, and `parse_array_header_line` from `decoders.cr`
   - Add `require "./array_header_parser"` to `decoders.cr`
