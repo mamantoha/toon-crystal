@@ -61,7 +61,6 @@ module Toon
         normalize_hash(value)
       else
         # Fallback: anything else becomes nil (functions, etc.)
-        nil
       end
     end
 
