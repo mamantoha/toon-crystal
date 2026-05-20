@@ -1,5 +1,6 @@
 require "./toon/version"
 require "./toon/constants"
+require "./toon/encode/options"
 require "./toon/encode/encoders"
 require "./toon/encode/normalizer"
 require "./toon/encode/primitives"
@@ -39,13 +40,7 @@ module Toon
     Decoders.decode_value(input, indent, strict, expand_paths)
   end
 
-  private def resolve_options(indent : Int32, delimiter : String | Char, key_folding : KeyFoldingMode, flatten_depth : Int32?)
-    {
-      indent:           indent,
-      delimiter:        delimiter.to_s,
-      key_folding_mode: key_folding,
-      flatten_depth:    flatten_depth,
-      flatten_limit:    flatten_depth ? flatten_depth : Int32::MAX,
-    }
+  private def resolve_options(indent : Int32, delimiter : String | Char, key_folding : KeyFoldingMode, flatten_depth : Int32?) : EncodeOptions
+    EncodeOptions.new(indent, delimiter.to_s, key_folding, flatten_depth)
   end
 end

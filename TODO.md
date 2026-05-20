@@ -10,7 +10,7 @@ Run `crystal spec` after each step to verify.
   - In `Decoders`: replace `alias JsonValue` with `alias JsonValue = Toon::JsonValue`, remove `IDENTIFIER_SEGMENT_REGEX`
   - In `Encoders`: remove `IDENTIFIER_SEGMENT_REGEX` (resolves via outer `Toon` module)
 
-- [ ] **Step 2** — Introduce `EncodeOptions` struct
+- [x] **Step 2** — Introduce `EncodeOptions` struct
   - Create `src/toon/encode/options.cr` with typed `EncodeOptions` struct (`indent`, `delimiter`, `key_folding_mode`, `flatten_depth`, `flatten_limit`)
   - Update private `resolve_options` in `src/toon.cr` to return `EncodeOptions`
   - Replace all `options[:xxx].as(...)` accesses in `encoders.cr` with typed `options.xxx`

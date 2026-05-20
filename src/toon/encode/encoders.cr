@@ -1,4 +1,5 @@
 require "../constants"
+require "./options"
 require "./normalizer"
 require "./primitives"
 require "./writer"
@@ -7,33 +8,25 @@ module Toon
   module Encoders
     extend self
 
-    private def flatten_limit(options) : Int32
-      options[:flatten_limit].as(Int32)
-    end
-
-    private def folding_enabled?(options) : Bool
-      key_folding_safe?(options)
-    end
-
     # Encode normalized value
-    def encode_value(value, options)
+    def encode_value(value, options : EncodeOptions)
       if Normalizer.json_primitive?(value)
-        return Primitives.encode_primitive(value, options[:delimiter])
+        return Primitives.encode_primitive(value, options.delimiter)
       end
 
-      writer = LineWriter.new(options[:indent])
+      writer = LineWriter.new(options.indent)
 
       if value.is_a?(Array)
         encode_array(nil, value.as(Array), writer, 0, options)
       elsif value.is_a?(Hash)
-        encode_object(value.as(Hash(String, Decoders::JsonValue)), writer, 0, options, folding_enabled?(options), nil)
+        encode_object(value.as(Hash(String, JsonValue)), writer, 0, options, options.key_folding_mode.safe?, nil)
       end
 
       writer.to_s
     end
 
     # Object encoding
-    def encode_object(value : Hash(String, Decoders::JsonValue), writer : LineWriter, depth : Int32, options, folding_enabled : Bool = folding_enabled?(options), chain_limit : Int32? = nil)
+    def encode_object(value : Hash(String, JsonValue), writer : LineWriter, depth : Int32, options : EncodeOptions, folding_enabled : Bool = options.key_folding_mode.safe?, chain_limit : Int32? = nil)
       keys = value.keys
 
       keys.each do |key|
@@ -43,10 +36,10 @@ module Toon
       end
     end
 
-    private def maybe_fold_key(key : String, value : Decoders::JsonValue, parent : Hash(String, Decoders::JsonValue), options, folding_enabled : Bool, chain_limit : Int32?) : {String, Decoders::JsonValue, Bool, Int32?}
+    private def maybe_fold_key(key : String, value : JsonValue, parent : Hash(String, JsonValue), options : EncodeOptions, folding_enabled : Bool, chain_limit : Int32?) : {String, JsonValue, Bool, Int32?}
       return {key, value, false, nil} unless folding_enabled
 
-      limit = chain_limit || flatten_limit(options)
+      limit = chain_limit || options.flatten_limit
       return {key, value, false, nil} if limit < 2
       return {key, value, folding_enabled, nil} unless foldable_segment?(key)
 
@@ -55,12 +48,12 @@ module Toon
       reason = :start
 
       while segments.size < limit
-        unless current_value.is_a?(Hash(String, Decoders::JsonValue))
+        unless current_value.is_a?(Hash(String, JsonValue))
           reason = :leaf
           break
         end
 
-        child_hash = current_value.as(Hash(String, Decoders::JsonValue))
+        child_hash = current_value.as(Hash(String, JsonValue))
         child_keys = child_hash.keys
 
         if child_keys.size != 1
@@ -86,7 +79,7 @@ module Toon
         reason = :continued
       end
 
-      if segments.size == limit && current_value.is_a?(Hash(String, Decoders::JsonValue))
+      if segments.size == limit && current_value.is_a?(Hash(String, JsonValue))
         reason = :limit
       end
 
@@ -108,7 +101,7 @@ module Toon
       child_enabled = folding_enabled
       child_limit : Int32? = nil
 
-      if current_value.is_a?(Hash(String, Decoders::JsonValue))
+      if current_value.is_a?(Hash(String, JsonValue))
         case reason
         when :limit, :unfoldable
           child_enabled = false
@@ -132,19 +125,15 @@ module Toon
       {folded_key, current_value, child_enabled, child_limit}
     end
 
-    private def key_folding_safe?(options) : Bool
-      options[:key_folding_mode].as(KeyFoldingMode).safe?
-    end
-
     private def foldable_segment?(segment : String) : Bool
       IDENTIFIER_SEGMENT_REGEX.matches?(segment)
     end
 
-    private def emit_key_value_pair(key : String, value, writer : LineWriter, depth : Int32, options, child_enabled : Bool, child_limit : Int32?)
+    private def emit_key_value_pair(key : String, value, writer : LineWriter, depth : Int32, options : EncodeOptions, child_enabled : Bool, child_limit : Int32?)
       encoded_key = Primitives.encode_key(key)
 
       if Normalizer.json_primitive?(value)
-        writer.push(depth, "#{encoded_key}: #{Primitives.encode_primitive(value, options[:delimiter])}")
+        writer.push(depth, "#{encoded_key}: #{Primitives.encode_primitive(value, options.delimiter)}")
       elsif value.is_a?(Array)
         encode_array(key, value, writer, depth, options, child_enabled)
       elsif value.is_a?(Hash)
@@ -156,13 +145,13 @@ module Toon
         else
           writer.push(depth, "#{encoded_key}:")
 
-          encode_object(value.as(Hash(String, Decoders::JsonValue)), writer, depth + 1, options, child_enabled, child_limit)
+          encode_object(value.as(Hash(String, JsonValue)), writer, depth + 1, options, child_enabled, child_limit)
         end
       end
     end
 
     # Array encoding
-    def encode_array(key : String?, value : Array, writer : LineWriter, depth : Int32, options, folding_enabled : Bool = folding_enabled?(options))
+    def encode_array(key : String?, value : Array, writer : LineWriter, depth : Int32, options : EncodeOptions, folding_enabled : Bool = options.key_folding_mode.safe?)
       if value.empty?
         if key
           writer.push(depth, "#{Primitives.encode_key(key)}: []")
@@ -209,19 +198,19 @@ module Toon
     end
 
     # Primitive array encoding (inline)
-    def encode_inline_primitive_array(key : String?, values : Array, writer : LineWriter, depth : Int32, options)
-      formatted = format_inline_array(values, options[:delimiter], key)
+    def encode_inline_primitive_array(key : String?, values : Array, writer : LineWriter, depth : Int32, options : EncodeOptions)
+      formatted = format_inline_array(values, options.delimiter, key)
       writer.push(depth, formatted)
     end
 
     # Array of arrays (expanded format)
-    def encode_array_of_arrays_as_list_items(key : String?, values : Array, writer : LineWriter, depth : Int32, options)
-      header = Primitives.format_header(values.size, key: key, delimiter: options[:delimiter])
+    def encode_array_of_arrays_as_list_items(key : String?, values : Array, writer : LineWriter, depth : Int32, options : EncodeOptions)
+      header = Primitives.format_header(values.size, key: key, delimiter: options.delimiter)
       writer.push(depth, header)
 
       values.each do |arr|
         if arr.is_a?(Array) && Normalizer.array_of_primitives?(arr)
-          inline = format_inline_array(arr, options[:delimiter], nil)
+          inline = format_inline_array(arr, options.delimiter, nil)
           writer.push(depth + 1, "#{LIST_ITEM_PREFIX}#{inline}")
         end
       end
@@ -240,8 +229,8 @@ module Toon
     end
 
     # Array of objects (tabular format)
-    def encode_array_of_objects_as_tabular(key : String?, rows : Array, header : Array(String), writer : LineWriter, depth : Int32, options)
-      header_str = Primitives.format_header(rows.size, key: key, fields: header, delimiter: options[:delimiter])
+    def encode_array_of_objects_as_tabular(key : String?, rows : Array, header : Array(String), writer : LineWriter, depth : Int32, options : EncodeOptions)
+      header_str = Primitives.format_header(rows.size, key: key, fields: header, delimiter: options.delimiter)
       writer.push(depth, header_str)
 
       write_tabular_rows(rows, header, writer, depth + 1, options)
@@ -277,18 +266,18 @@ module Toon
       end
     end
 
-    def write_tabular_rows(rows, header : Array(String), writer : LineWriter, depth : Int32, options)
+    def write_tabular_rows(rows, header : Array(String), writer : LineWriter, depth : Int32, options : EncodeOptions)
       rows.each do |row|
         next unless row.is_a?(Hash)
 
         values = header.map { |key| row[key] }
-        joined_value = Primitives.join_encoded_values(values, options[:delimiter])
+        joined_value = Primitives.join_encoded_values(values, options.delimiter)
         writer.push(depth, joined_value)
       end
     end
 
-    private def emit_tabular_header_and_rows(writer : LineWriter, header_depth : Int32, row_depth : Int32, key : String?, rows : Array, header : Array(String), options, include_list_prefix : Bool = false)
-      header_str = Primitives.format_header(rows.size, key: key, fields: header, delimiter: options[:delimiter])
+    private def emit_tabular_header_and_rows(writer : LineWriter, header_depth : Int32, row_depth : Int32, key : String?, rows : Array, header : Array(String), options : EncodeOptions, include_list_prefix : Bool = false)
+      header_str = Primitives.format_header(rows.size, key: key, fields: header, delimiter: options.delimiter)
 
       if include_list_prefix
         writer.push(header_depth, "#{LIST_ITEM_PREFIX}#{header_str}")
@@ -299,12 +288,12 @@ module Toon
       write_tabular_rows(rows, header, writer, row_depth, options)
     end
 
-    private def try_emit_compact_array_list_item(writer : LineWriter, depth : Int32, key : String?, arr : Array, options) : Bool
+    private def try_emit_compact_array_list_item(writer : LineWriter, depth : Int32, key : String?, arr : Array, options : EncodeOptions) : Bool
       if Normalizer.array_of_primitives?(arr)
         if arr.empty? && key
           writer.push(depth, "#{LIST_ITEM_PREFIX}#{Primitives.encode_key(key)}: []")
         else
-          formatted = format_inline_array(arr, options[:delimiter], key)
+          formatted = format_inline_array(arr, options.delimiter, key)
           writer.push(depth, "#{LIST_ITEM_PREFIX}#{formatted}")
         end
         return true
@@ -321,28 +310,28 @@ module Toon
     end
 
     # Array of objects (expanded format)
-    def encode_mixed_array_as_list_items(key : String?, items : Array, writer : LineWriter, depth : Int32, options, folding_enabled : Bool = folding_enabled?(options))
-      header = Primitives.format_header(items.size, key: key, delimiter: options[:delimiter])
+    def encode_mixed_array_as_list_items(key : String?, items : Array, writer : LineWriter, depth : Int32, options : EncodeOptions, folding_enabled : Bool = options.key_folding_mode.safe?)
+      header = Primitives.format_header(items.size, key: key, delimiter: options.delimiter)
       writer.push(depth, header)
 
       items.each do |item|
         if Normalizer.json_primitive?(item)
           # Direct primitive as list item
-          writer.push(depth + 1, "#{LIST_ITEM_PREFIX}#{Primitives.encode_primitive(item, options[:delimiter])}")
+          writer.push(depth + 1, "#{LIST_ITEM_PREFIX}#{Primitives.encode_primitive(item, options.delimiter)}")
         elsif item.is_a?(Array)
           # Direct array as list item
           if Normalizer.array_of_primitives?(item)
-            inline = format_inline_array(item, options[:delimiter], nil)
+            inline = format_inline_array(item, options.delimiter, nil)
             writer.push(depth + 1, "#{LIST_ITEM_PREFIX}#{inline}")
           elsif Normalizer.array_of_objects?(item)
             # Array of objects as a nested list item: emit header then inner objects
-            header_str = Primitives.format_header(item.size, delimiter: options[:delimiter])
+            header_str = Primitives.format_header(item.size, delimiter: options.delimiter)
             writer.push(depth + 1, "#{LIST_ITEM_PREFIX}#{header_str}")
 
             item.each do |sub|
               if sub.is_a?(Hash)
                 # encode inner objects as list items, with increased depth
-                encode_object_as_list_item(sub.as(Hash(String, Decoders::JsonValue)), writer, depth + 2, options, folding_enabled)
+                encode_object_as_list_item(sub.as(Hash(String, JsonValue)), writer, depth + 2, options, folding_enabled)
               end
             end
           end
@@ -353,7 +342,7 @@ module Toon
       end
     end
 
-    def encode_object_as_list_item(obj : Hash(String, Decoders::JsonValue), writer : LineWriter, depth : Int32, options, folding_enabled : Bool = folding_enabled?(options), chain_limit : Int32? = nil)
+    def encode_object_as_list_item(obj : Hash(String, JsonValue), writer : LineWriter, depth : Int32, options : EncodeOptions, folding_enabled : Bool = options.key_folding_mode.safe?, chain_limit : Int32? = nil)
       keys = obj.keys
 
       if keys.empty?
@@ -386,7 +375,7 @@ module Toon
       first_value = folded_first_value
 
       if Normalizer.json_primitive?(first_value)
-        writer.push(depth, "#{LIST_ITEM_PREFIX}#{encoded_key}: #{Primitives.encode_primitive(first_value, options[:delimiter])}")
+        writer.push(depth, "#{LIST_ITEM_PREFIX}#{encoded_key}: #{Primitives.encode_primitive(first_value, options.delimiter)}")
       elsif first_value.is_a?(Array)
         arr = first_value
 
@@ -399,7 +388,7 @@ module Toon
 
             arr.each do |item|
               if item.is_a?(Hash)
-                encode_object_as_list_item(item.as(Hash(String, Decoders::JsonValue)), writer, depth + 2, options, first_child_enabled)
+                encode_object_as_list_item(item.as(Hash(String, JsonValue)), writer, depth + 2, options, first_child_enabled)
               end
             end
           else
@@ -409,12 +398,12 @@ module Toon
             # Encode array contents at depth + 2 (header printed on hyphen line)
             arr.each do |item|
               if Normalizer.json_primitive?(item)
-                writer.push(depth + 2, "#{LIST_ITEM_PREFIX}#{Primitives.encode_primitive(item, options[:delimiter])}")
+                writer.push(depth + 2, "#{LIST_ITEM_PREFIX}#{Primitives.encode_primitive(item, options.delimiter)}")
               elsif item.is_a?(Array) && Normalizer.array_of_primitives?(item)
-                inline = format_inline_array(item, options[:delimiter], nil)
+                inline = format_inline_array(item, options.delimiter, nil)
                 writer.push(depth + 2, "#{LIST_ITEM_PREFIX}#{inline}")
               elsif item.is_a?(Hash)
-                encode_object_as_list_item(item.as(Hash(String, Decoders::JsonValue)), writer, depth + 2, options, first_child_enabled)
+                encode_object_as_list_item(item.as(Hash(String, JsonValue)), writer, depth + 2, options, first_child_enabled)
               end
             end
           end
@@ -426,7 +415,7 @@ module Toon
           writer.push(depth, "#{LIST_ITEM_PREFIX}#{encoded_key}:")
         else
           writer.push(depth, "#{LIST_ITEM_PREFIX}#{encoded_key}:")
-          encode_object(first_value.as(Hash(String, Decoders::JsonValue)), writer, depth + 2, options, first_child_enabled, first_child_limit)
+          encode_object(first_value.as(Hash(String, JsonValue)), writer, depth + 2, options, first_child_enabled, first_child_limit)
         end
       end
 

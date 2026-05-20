@@ -61,10 +61,6 @@ module Toon
   module Decoders
     extend self
 
-    # Compatibility alias — canonical definition lives in Toon::JsonValue (constants.cr)
-    alias JsonValue = Toon::JsonValue
-
-
     struct KeyToken
       getter value : String
       getter? quoted : Bool
@@ -188,7 +184,7 @@ module Toon
       decode_object(cursor, first.depth, delimiter, strict, expand_paths)
     end
 
-    private def decode_object(cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool, expand_paths : ExpandPathsMode) : Hash(String, JsonValue)
+    private def decode_object(cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool, expand_paths : ExpandPathsMode) : JsonValue
       obj = {} of String => JsonValue
 
       until cursor.at_end?

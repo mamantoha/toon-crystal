@@ -30,7 +30,7 @@ module FixtureHelper
   end
 
   # Convert JSON::Any to Crystal value (for encode input)
-  def json_to_crystal(json : JSON::Any) : Toon::Decoders::JsonValue
+  def json_to_crystal(json : JSON::Any) : Toon::JsonValue
     case json.raw
     when Nil
       nil
@@ -45,7 +45,7 @@ module FixtureHelper
     when Array(JSON::Any)
       json.as_a.map { |item| json_to_crystal(item) }
     when Hash(String, JSON::Any)
-      result = {} of String => Toon::Decoders::JsonValue
+      result = {} of String => Toon::JsonValue
       json.as_h.each do |k, v|
         result[k] = json_to_crystal(v)
       end
@@ -74,7 +74,7 @@ module FixtureHelper
   end
 
   # Compare two JSON values for equality
-  def json_equal?(actual : Toon::Decoders::JsonValue, expected : JSON::Any) : Bool
+  def json_equal?(actual : Toon::JsonValue, expected : JSON::Any) : Bool
     case expected.raw
     when Nil
       actual.nil?
@@ -95,7 +95,7 @@ module FixtureHelper
       actual.is_a?(String) && actual == expected.as_s
     when Array(JSON::Any)
       return false unless actual.is_a?(Array)
-      actual_arr = actual.as(Array(Toon::Decoders::JsonValue))
+      actual_arr = actual.as(Array(Toon::JsonValue))
       expected_arr = expected.as_a
       return false unless actual_arr.size == expected_arr.size
       actual_arr.each_with_index do |item, i|
@@ -104,7 +104,7 @@ module FixtureHelper
       true
     when Hash(String, JSON::Any)
       return false unless actual.is_a?(Hash)
-      actual_hash = actual.as(Hash(String, Toon::Decoders::JsonValue))
+      actual_hash = actual.as(Hash(String, Toon::JsonValue))
       expected_hash = expected.as_h
       return false unless actual_hash.size == expected_hash.size
       expected_hash.each do |k, v|
@@ -118,7 +118,7 @@ module FixtureHelper
   end
 
   # Convert JSON::Any to Crystal value for Toon.encode input (can be primitive, hash, or array)
-  def json_to_encode_input(json : JSON::Any) : Toon::Decoders::JsonValue
+  def json_to_encode_input(json : JSON::Any) : Toon::JsonValue
     json_to_crystal(json)
   end
 
