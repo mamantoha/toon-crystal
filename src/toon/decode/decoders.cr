@@ -1,6 +1,7 @@
 require "../constants"
 require "./error"
 require "./line_cursor"
+require "./string_parser"
 
 module Toon
   module Decoders
@@ -520,52 +521,6 @@ module Toon
       end
     end
 
-    # --- Parsing helpers ---
-    private def key_value_line?(content : String) : Bool
-      # detect a colon outside of quotes
-      i = 0
-      in_quotes = false
-      escaped = false
-
-      while i < content.size
-        ch = content[i]
-
-        if in_quotes
-          if !escaped && ch == '"'
-            in_quotes = false
-          end
-          escaped = (!escaped && ch == '\\')
-        else
-          return true if ch == ':'
-          in_quotes = true if ch == '"'
-        end
-        i += 1
-      end
-
-      false
-    end
-
-    private def find_unquoted_colon_index(content : String) : Int32?
-      i = 0
-      in_quotes = false
-      escaped = false
-
-      while i < content.size
-        ch = content[i]
-        if in_quotes
-          if !escaped && ch == '"'
-            in_quotes = false
-          end
-          escaped = (!escaped && ch == '\\')
-        else
-          return i if ch == ':'
-          in_quotes = true if ch == '"'
-        end
-        i += 1
-      end
-      nil
-    end
-
     private def parse_key_token(content : String) : {KeyToken, String}
       # returns key and remainder after colon
       i = 0
@@ -602,102 +557,6 @@ module Toon
       end
     end
 
-    private def parse_primitive_token(token : String) : JsonValue
-      str = token.strip
-      return if str == NULL_LITERAL
-      return true if str == TRUE_LITERAL
-      return false if str == FALSE_LITERAL
-
-      if str.starts_with?(DOUBLE_QUOTE)
-        return parse_string_literal(str)
-      end
-
-      # number?
-      if str.match(/^[-+]?(?:\d+\.\d*|\d*\.\d+|\d+)(?:[eE][+-]?\d+)?$/)
-        if str.match(/^[-+]?\d+$/)
-          s = str
-          s = s.byte_slice(1) if s.starts_with?('+') || s.starts_with?('-')
-
-          # leading zeros (e.g., 05) are treated as strings
-          return str if s.size > 1 && s.starts_with?('0')
-          return str.to_i64
-        end
-
-        # Parse as float first
-        float_val = str.to_f64
-
-        # Normalize -0.0 to 0 (check if string starts with '-' and value is zero)
-        if float_val == 0.0 && str.starts_with?('-')
-          return 0_i64
-        end
-
-        # If the float is a whole number, return as integer
-        if float_val == float_val.trunc
-          return float_val.to_i64
-        end
-
-        return float_val
-      end
-
-      # bare string
-      str
-    end
-
-    private def parse_string_literal(raw : String) : String
-      s = raw.strip
-
-      # Must start and end with quotes
-      unless s.starts_with?(DOUBLE_QUOTE)
-        return s
-      end
-
-      raise DecodeError.new("Unterminated string: missing closing quote") unless s.ends_with?(DOUBLE_QUOTE)
-
-      inner = s[1, s.size - 2]
-
-      # unescape with validation
-      result = String.build do |io|
-        i = 0
-        while i < inner.size
-          ch = inner[i]
-          if ch == '\\'
-            raise DecodeError.new("Unterminated escape sequence") if i + 1 >= inner.size
-            nxt = inner[i + 1]
-            case nxt
-            when 'n'  then io << '\n'
-            when 'r'  then io << '\r'
-            when 't'  then io << '\t'
-            when '"'  then io << '"'
-            when '\\' then io << '\\'
-            when 'u'
-              raise DecodeError.new("Invalid unicode escape sequence") if i + 5 >= inner.size
-
-              hex = inner[i + 2, 4]
-              unless hex =~ /^[0-9a-fA-F]{4}$/
-                raise DecodeError.new("Invalid unicode escape sequence")
-              end
-
-              codepoint = hex.to_i(16)
-              if codepoint >= 0xD800 && codepoint <= 0xDFFF
-                raise DecodeError.new("Invalid unicode escape sequence")
-              end
-
-              io << codepoint.chr
-              i += 6
-              next
-            else
-              raise DecodeError.new("Invalid escape sequence: \\#{nxt}")
-            end
-            i += 2
-          else
-            io << ch
-            i += 1
-          end
-        end
-      end
-      result
-    end
-
     private def validate_malformed_array_header_strict!(content : String, strict : Bool)
       return unless strict
 
@@ -720,30 +579,6 @@ module Toon
       return if suffix.starts_with?('{') && suffix.ends_with?('}')
 
       raise DecodeError.new("Invalid array header syntax")
-    end
-
-    private def find_unquoted_char_index(content : String, target : Char) : Int32?
-      i = 0
-      in_quotes = false
-      escaped = false
-
-      while i < content.size
-        ch = content[i]
-
-        if in_quotes
-          if !escaped && ch == '"'
-            in_quotes = false
-          end
-          escaped = (!escaped && ch == '\\')
-        else
-          return i if ch == target
-          in_quotes = true if ch == '"'
-        end
-
-        i += 1
-      end
-
-      nil
     end
 
     private def parse_array_header_line(content : String) : {ArrayHeader, String?}?
@@ -887,40 +722,6 @@ module Toon
 
     private def object_field_after_hyphen?(after_hyphen : String) : Bool
       key_value_line?(after_hyphen)
-    end
-
-    private def parse_delimited_values(values_str : String, delimiter : String) : Array(String)
-      result = [] of String
-      return result if values_str.empty?
-
-      in_quotes = false
-      escaped = false
-      token_start = 0
-      i = 0
-
-      while i < values_str.size
-        ch = values_str[i]
-        if in_quotes
-          if !escaped && ch == '"'
-            in_quotes = false
-          end
-          escaped = (!escaped && ch == '\\')
-        else
-          if ch == '"'
-            in_quotes = true
-          elsif ch == delimiter[0]
-            # delimiter match (single-char delimiters supported)
-            result << values_str[token_start, i - token_start].strip
-            token_start = i + 1
-          end
-        end
-        i += 1
-      end
-
-      # last token
-      result << values_str[token_start, values_str.size - token_start].strip
-
-      result
     end
 
     private def assert_expected_count(actual : Int32, expected : Int32, what : String)

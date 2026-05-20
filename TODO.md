@@ -26,7 +26,7 @@ Run `crystal spec` after each step to verify.
   - Create `src/toon/decode/line_cursor.cr` with `struct ParsedLine` and `class LineCursor`
   - Replace definitions in `decoders.cr` with `require "./line_cursor"`
 
-- [ ] **Step 5** — Extract string/escape parsing to dedicated file
+- [x] **Step 5** — Extract string/escape parsing to dedicated file
   - Create `src/toon/decode/string_parser.cr`
   - Move these methods from `decoders.cr`: `parse_string_literal`, `parse_primitive_token`, `parse_delimited_values`, `find_unquoted_colon_index`, `find_unquoted_char_index`, `key_value_line?`
   - Add `require "./string_parser"` to `decoders.cr`
