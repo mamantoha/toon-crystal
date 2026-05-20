@@ -1,12 +1,13 @@
+Lint/NotNil:
+  Excluded:
+  - spec/internal/array_header_parser_spec.cr
+
+Lint/SpecFilename:
+  Excluded:
+  - spec/fixture_helper.cr
+
 Metrics/CyclomaticComplexity:
   Enabled: false
 
 Naming/BlockParameterName:
   Enabled: false
-
-Lint/ElseNil:
-  Enabled: false
-
-Lint/SpecFilename:
-  Excluded:
-  - spec/fixture_helper.cr

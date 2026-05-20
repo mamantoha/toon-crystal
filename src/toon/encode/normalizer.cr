@@ -9,7 +9,7 @@ module Toon
     # Normalization (unknown → JSON-compatible value)
     def normalize_value(value)
       # Handle JsonValue types first (before Array/Hash checks)
-      if value.is_a?(Decoders::JsonValue)
+      if value.is_a?(JsonValue)
         if value.is_a?(Array)
           return normalize_array(value.as(Array))
         elsif value.is_a?(Hash)
@@ -18,11 +18,11 @@ module Toon
           # Primitive JsonValue, return as-is but ensure correct types
           case value
           when Int32
-            return value.to_i64.as(Decoders::JsonValue)
+            return value.to_i64.as(JsonValue)
           when Float32
-            return value.to_f64.as(Decoders::JsonValue)
+            return value.to_f64.as(JsonValue)
           else
-            return value.as(Decoders::JsonValue)
+            return value.as(JsonValue)
           end
         end
       end
@@ -61,102 +61,51 @@ module Toon
         normalize_hash(value)
       else
         # Fallback: anything else becomes nil (functions, etc.)
-        nil
       end
     end
 
-    private def normalize_array(array : Array) : Decoders::JsonValue
-      # Handle JsonValue arrays explicitly
-      if array.is_a?(Array(Decoders::JsonValue))
-        result = [] of Decoders::JsonValue
-        array.each do |v|
-          normalized = normalize_value(v)
-          # Convert to JsonValue-compatible type
-          case normalized
-          when Decoders::JsonValue
-            result << normalized
-          when Int32
-            result << normalized.to_i64
-          when Float32
-            result << normalized.to_f64
-          when Array
-            result << normalize_array(normalized).as(Decoders::JsonValue)
-          when Hash
-            result << normalize_hash(normalized).as(Decoders::JsonValue)
-          else
-            result << normalized.as(Decoders::JsonValue)
-          end
-        end
-        return result.as(Decoders::JsonValue)
-      end
-
-      # For other arrays, normalize and cast to JsonValue
-      result = [] of Decoders::JsonValue
+    private def normalize_array(array : Array) : JsonValue
+      result = [] of JsonValue
       array.each do |v|
         normalized = normalize_value(v)
         case normalized
-        when Decoders::JsonValue
+        when JsonValue
           result << normalized
         when Int32
           result << normalized.to_i64
         when Float32
           result << normalized.to_f64
         when Array
-          result << normalize_array(normalized).as(Decoders::JsonValue)
+          result << normalize_array(normalized).as(JsonValue)
         when Hash
-          result << normalize_hash(normalized).as(Decoders::JsonValue)
+          result << normalize_hash(normalized).as(JsonValue)
         else
-          result << normalized.as(Decoders::JsonValue)
+          result << normalized.as(JsonValue)
         end
       end
-      result.as(Decoders::JsonValue)
+      result.as(JsonValue)
     end
 
-    private def normalize_hash(hash : Hash) : Decoders::JsonValue
-      # Handle JsonValue hashes explicitly
-      if hash.is_a?(Hash(String, Decoders::JsonValue))
-        result = {} of String => Decoders::JsonValue
-        hash.each do |k, v|
-          normalized = normalize_value(v)
-          # Convert to JsonValue-compatible type
-          case normalized
-          when Decoders::JsonValue
-            result[k.to_s] = normalized
-          when Int32
-            result[k.to_s] = normalized.to_i64
-          when Float32
-            result[k.to_s] = normalized.to_f64
-          when Array
-            result[k.to_s] = normalize_array(normalized).as(Decoders::JsonValue)
-          when Hash
-            result[k.to_s] = normalize_hash(normalized).as(Decoders::JsonValue)
-          else
-            result[k.to_s] = normalized.as(Decoders::JsonValue)
-          end
-        end
-        return result.as(Decoders::JsonValue)
-      end
-
-      # For other hashes, normalize and cast to JsonValue
-      result = {} of String => Decoders::JsonValue
+    private def normalize_hash(hash : Hash) : JsonValue
+      result = {} of String => JsonValue
       hash.each do |k, v|
         normalized = normalize_value(v)
         case normalized
-        when Decoders::JsonValue
+        when JsonValue
           result[k.to_s] = normalized
         when Int32
           result[k.to_s] = normalized.to_i64
         when Float32
           result[k.to_s] = normalized.to_f64
         when Array
-          result[k.to_s] = normalize_array(normalized).as(Decoders::JsonValue)
+          result[k.to_s] = normalize_array(normalized).as(JsonValue)
         when Hash
-          result[k.to_s] = normalize_hash(normalized).as(Decoders::JsonValue)
+          result[k.to_s] = normalize_hash(normalized).as(JsonValue)
         else
-          result[k.to_s] = normalized.as(Decoders::JsonValue)
+          result[k.to_s] = normalized.as(JsonValue)
         end
       end
-      result.as(Decoders::JsonValue)
+      result.as(JsonValue)
     end
 
     # Type guards
