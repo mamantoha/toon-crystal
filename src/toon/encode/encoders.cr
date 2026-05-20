@@ -7,8 +7,6 @@ module Toon
   module Encoders
     extend self
 
-    IDENTIFIER_SEGMENT_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/
-
     private def flatten_limit(options) : Int32
       options[:flatten_limit].as(Int32)
     end

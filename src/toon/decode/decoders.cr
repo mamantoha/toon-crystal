@@ -61,9 +61,9 @@ module Toon
   module Decoders
     extend self
 
-    alias JsonValue = Bool | Int64 | Float64 | String | Array(JsonValue) | Hash(String, JsonValue)?
+    # Compatibility alias — canonical definition lives in Toon::JsonValue (constants.cr)
+    alias JsonValue = Toon::JsonValue
 
-    IDENTIFIER_SEGMENT_REGEX = /^[A-Za-z_][A-Za-z0-9_]*$/
 
     struct KeyToken
       getter value : String
