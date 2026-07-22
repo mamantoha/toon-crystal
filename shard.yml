@@ -7,8 +7,3 @@ description: |
   TOON is a compact, human-readable format designed for passing structured data to Large Language Models with significantly reduced token usage.
 license: MIT
 repository: https://github.com/mamantoha/toon-crystal
-
-development_dependencies:
-  ameba:
-    github: crystal-ameba/ameba
-    branch: master
