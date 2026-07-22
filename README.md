@@ -80,7 +80,7 @@ Converts any value to TOON format.
 **Parameters:**
 
 - `value` – Any value to encode (Hash, Array, primitives, or nested structures)
-- `indent` – Number of spaces per indentation level (default: `2`)
+- `indent` – Positive number of spaces per indentation level (default: `2`)
 - `delimiter` – Delimiter for array values and tabular rows: `','`, `'\t'`, or `'|'` (default: `','`)
 
 **Returns:**
@@ -114,7 +114,7 @@ Parses a TOON-formatted string into native Crystal values.
 **Parameters:**
 
 - `input` – TOON-formatted string
-- `indent` – Number of spaces per indentation level (default: `2`)
+- `indent` – Positive number of spaces per indentation level (default: `2`)
 - `strict` – Enable validations for indentation, tabs, blank lines, and extra rows/items (default: `true`)
 
 **Returns:**
