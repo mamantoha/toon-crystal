@@ -47,7 +47,7 @@ module Toon
     end
 
     private def parse_primitive_token(token : String) : JsonValue
-      str = token.strip
+      str = trim_token_spaces(token)
       return if str == NULL_LITERAL
       return true if str == TRUE_LITERAL
       return false if str == FALSE_LITERAL
@@ -56,12 +56,8 @@ module Toon
         return parse_string_literal(str)
       end
 
-      if str.match(/^[-+]?(?:\d+\.\d*|\d*\.\d+|\d+)(?:[eE][+-]?\d+)?$/)
-        if str.match(/^[-+]?\d+$/)
-          s = str
-          s = s.byte_slice(1) if s.starts_with?('+') || s.starts_with?('-')
-
-          return str if s.size > 1 && s.starts_with?('0')
+      if str.match(/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/)
+        if str.match(/^-?(?:0|[1-9]\d*)$/)
           return str.to_i64
         end
 
@@ -178,15 +174,19 @@ module Toon
           if ch == '"'
             in_quotes = true
           elsif ch == delimiter[0]
-            result << values_str[token_start, i - token_start].strip
+            result << trim_token_spaces(values_str[token_start, i - token_start])
             token_start = i + 1
           end
         end
         i += 1
       end
 
-      result << values_str[token_start, values_str.size - token_start].strip
+      result << trim_token_spaces(values_str[token_start, values_str.size - token_start])
       result
+    end
+
+    private def trim_token_spaces(value : String) : String
+      value.gsub(/^ +| +$/, "")
     end
   end
 end

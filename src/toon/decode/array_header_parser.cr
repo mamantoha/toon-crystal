@@ -10,14 +10,31 @@ module Toon
       end
     end
 
+    class FieldNode
+      getter name : String
+      getter children : Array(FieldNode)?
+
+      def initialize(@name : String, @children : Array(FieldNode)? = nil)
+      end
+
+      def leaf_count : Int32
+        @children.try(&.sum(&.leaf_count)) || 1
+      end
+
+      def ==(other : String)
+        @children.nil? && @name == other
+      end
+    end
+
     # Internal representation of an array header
     struct ArrayHeader
       property key_token : KeyToken?
       property length : Int32
       property delimiter : String
-      property fields : Array(String)?
+      property fields : Array(FieldNode)?
+      property? keyed : Bool
 
-      def initialize(@key_token : KeyToken?, @length : Int32, @delimiter : String, @fields : Array(String)?)
+      def initialize(@key_token : KeyToken?, @length : Int32, @delimiter : String, @fields : Array(FieldNode)?, @keyed : Bool = false)
       end
 
       def key : String?
@@ -80,6 +97,7 @@ module Toon
         before = rest.byte_slice(0, idx).strip
 
         if !before.empty?
+          return if find_unquoted_colon_index(before)
           if before.starts_with?(DOUBLE_QUOTE)
             key_token = KeyToken.new(parse_string_literal(before), true)
           else
@@ -108,7 +126,7 @@ module Toon
       end
 
       if cursor < rest.size && rest[cursor] == '{'
-        brace_end = rest.index('}', cursor)
+        brace_end = matching_brace_index(rest, cursor)
         return unless brace_end
         cursor = brace_end + 1
       end
@@ -131,8 +149,18 @@ module Toon
       len_and_delim = inside
       len_str = len_and_delim
       delim : String? = nil
+      keyed = false
 
-      if len_and_delim.size > 0
+      if marker = len_and_delim.index(':')
+        keyed = true
+        len_str = len_and_delim.byte_slice(0, marker)
+        return if len_str != len_str.strip
+        delimiter_part = len_and_delim.byte_slice(marker + 1)
+        return unless delimiter_part.empty? || delimiter_part == PIPE.to_s || delimiter_part == TAB.to_s
+        delim = delimiter_part unless delimiter_part.empty?
+      end
+
+      if !keyed && len_and_delim.size > 0
         # if last char is a delimiter override, separate it from the length
         last = len_and_delim[-1]
 
@@ -147,7 +175,7 @@ module Toon
       length = len_str.to_i?
       return unless length
 
-      fields : Array(String)? = nil
+      fields : Array(FieldNode)? = nil
       brace_idx = header_seg.index('{')
 
       if brace_idx
@@ -157,19 +185,90 @@ module Toon
           inside_fields = header_seg.byte_slice(brace_idx + 1, close_brace - brace_idx - 1)
           # fields are key-encoded; split respecting quotes using active delimiter (fallback COMMA)
           delim_for_fields = delim || DEFAULT_DELIMITER.to_s
-          tokens = parse_delimited_values(inside_fields, delim_for_fields)
-          fields = tokens.map { |f| f.starts_with?(DOUBLE_QUOTE) ? parse_string_literal(f) : f }
+          fields = parse_field_nodes(inside_fields, delim_for_fields)
+          return if fields.nil? || fields.empty?
         end
       end
 
-      header = ArrayHeader.new(key_token, length, (delim || DEFAULT_DELIMITER.to_s), fields)
+      return if keyed && fields.nil?
+      header = ArrayHeader.new(key_token, length, (delim || DEFAULT_DELIMITER.to_s), fields, keyed)
 
-      inline_values = tail.strip.empty? ? nil : tail.strip
+      trimmed_tail = trim_token_spaces(tail)
+      inline_values = trimmed_tail.empty? ? nil : trimmed_tail
       {header, inline_values}
     end
 
     private def delimiter_char?(ch : Char) : Bool
       ch == COMMA || ch == TAB || ch == PIPE
+    end
+
+    private def matching_brace_index(value : String, start : Int32) : Int32?
+      depth = 0
+      in_quotes = false
+      escaped = false
+      (start...value.size).each do |i|
+        ch = value[i]
+        if in_quotes
+          in_quotes = false if !escaped && ch == '"'
+          escaped = !escaped && ch == '\\'
+        elsif ch == '"'
+          in_quotes = true
+        elsif ch == '{'
+          depth += 1
+        elsif ch == '}'
+          depth -= 1
+          return i if depth == 0
+        end
+      end
+      nil
+    end
+
+    private def parse_field_nodes(value : String, delimiter : String) : Array(FieldNode)?
+      tokens = split_field_tokens(value, delimiter)
+      return unless tokens
+      nodes = [] of FieldNode
+      tokens.each do |token|
+        return if token.empty?
+        if brace = find_unquoted_char_index(token, '{')
+          return unless token.ends_with?('}')
+          name_token = token.byte_slice(0, brace)
+          children = parse_field_nodes(token.byte_slice(brace + 1, token.size - brace - 2), delimiter)
+          return if children.nil? || children.empty?
+          name = name_token.starts_with?(DOUBLE_QUOTE) ? parse_string_literal(name_token) : name_token
+          nodes << FieldNode.new(name, children)
+        else
+          name = token.starts_with?(DOUBLE_QUOTE) ? parse_string_literal(token) : token
+          nodes << FieldNode.new(name)
+        end
+      end
+      nodes
+    end
+
+    private def split_field_tokens(value : String, delimiter : String) : Array(String)?
+      result = [] of String
+      depth = 0
+      in_quotes = false
+      escaped = false
+      start = 0
+      value.each_char_with_index do |ch, i|
+        if in_quotes
+          in_quotes = false if !escaped && ch == '"'
+          escaped = !escaped && ch == '\\'
+        elsif ch == '"'
+          in_quotes = true
+        elsif ch == '{'
+          depth += 1
+        elsif ch == '}'
+          depth -= 1
+          return if depth < 0
+        elsif ch == delimiter[0] && depth == 0
+          result << trim_token_spaces(value.byte_slice(start, i - start))
+          start = i + 1
+        end
+      end
+      return if depth != 0 || in_quotes
+      result << trim_token_spaces(value.byte_slice(start))
+      result
     end
   end
 end
