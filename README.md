@@ -52,7 +52,7 @@ user:
   name: Ada
   tags[2]: reading,gaming
   active: true
-  preferences[0]:
+  preferences: []
 ```
 
 You can also decode TOON back to Crystal values:
@@ -64,7 +64,7 @@ toon = <<-TOON
     name: Ada
     tags[2]: reading,gaming
     active: true
-    preferences[0]:
+    preferences: []
   TOON
 
 value = Toon.decode(toon)
