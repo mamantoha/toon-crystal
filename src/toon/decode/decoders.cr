@@ -205,7 +205,7 @@ module Toon
     private def decode_array_from_header(header : ArrayHeader, inline_values : String?, cursor : LineCursor, base_depth : Int32, default_delim : String, strict : Bool, expand_paths : ExpandPathsMode) : JsonValue
       active_delim = header.delimiter || default_delim
 
-      if header.keyed
+      if header.keyed?
         raise DecodeError.new("Inline content after keyed header") if inline_values
         return decode_keyed_object(header, cursor, base_depth, active_delim, strict)
       end
@@ -332,7 +332,9 @@ module Toon
       fields.each do |field|
         raise DecodeError.new("Duplicate tabular field '#{field.name}'") if seen.includes?(field.name)
         seen << field.name
-        validate_unique_fields!(field.children.not_nil!) if field.children
+        if children = field.children
+          validate_unique_fields!(children)
+        end
       end
     end
 
@@ -423,7 +425,7 @@ module Toon
         if parsed = parse_array_header_line(after_hyphen)
           header, inline_values = parsed
 
-          if strict && header.key.nil? && (header.keyed || header.fields)
+          if strict && header.key.nil? && (header.keyed? || header.fields)
             raise DecodeError.new("Keyless structured header cannot be a list item")
           end
 

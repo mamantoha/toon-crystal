@@ -32,7 +32,7 @@ module Toon
       property length : Int32
       property delimiter : String
       property fields : Array(FieldNode)?
-      property keyed : Bool
+      property? keyed : Bool
 
       def initialize(@key_token : KeyToken?, @length : Int32, @delimiter : String, @fields : Array(FieldNode)?, @keyed : Bool = false)
       end
@@ -186,7 +186,7 @@ module Toon
           # fields are key-encoded; split respecting quotes using active delimiter (fallback COMMA)
           delim_for_fields = delim || DEFAULT_DELIMITER.to_s
           fields = parse_field_nodes(inside_fields, delim_for_fields)
-          return unless fields && !fields.empty?
+          return if fields.nil? || fields.empty?
         end
       end
 
@@ -233,7 +233,7 @@ module Toon
           return unless token.ends_with?('}')
           name_token = token.byte_slice(0, brace)
           children = parse_field_nodes(token.byte_slice(brace + 1, token.size - brace - 2), delimiter)
-          return unless children && !children.empty?
+          return if children.nil? || children.empty?
           name = name_token.starts_with?(DOUBLE_QUOTE) ? parse_string_literal(name_token) : name_token
           nodes << FieldNode.new(name, children)
         else
@@ -266,7 +266,7 @@ module Toon
           start = i + 1
         end
       end
-      return unless depth == 0 && !in_quotes
+      return if depth != 0 || in_quotes
       result << trim_token_spaces(value.byte_slice(start))
       result
     end
