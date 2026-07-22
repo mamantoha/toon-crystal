@@ -1,7 +1,7 @@
 # TOON Format for Crystal
 
 [![Crystal CI](https://github.com/mamantoha/toon-crystal/actions/workflows/crystal.yml/badge.svg)](https://github.com/mamantoha/toon-crystal/actions/workflows/crystal.yml)
-[![GitHub release](https://img.shields.io/github/release/mamantoha/toon-crystal.svg)](https://github.com/mamantoha/flag_emoji/releases)
+[![GitHub release](https://img.shields.io/github/release/mamantoha/toon-crystal.svg)](https://github.com/mamantoha/toon-crystal/releases/latest)
 [![License](https://img.shields.io/github/license/mamantoha/toon-crystal.svg)](https://github.com/mamantoha/toon-crystal/blob/main/LICENSE)
 
 **Token-Oriented Object Notation** is a compact, human-readable serialization format designed for passing structured data to Large Language Models with significantly reduced token usage. It's intended for LLM input, not output.
