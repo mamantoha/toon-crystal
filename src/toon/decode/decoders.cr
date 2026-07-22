@@ -355,8 +355,8 @@ module Toon
         cursor.advance
         colon = find_unquoted_colon_index(line.content)
         raise DecodeError.new("Invalid keyed entry row") unless colon
-        key = parse_key_token_value(trim_token_spaces(line.content.byte_slice(0, colon)))
-        cell_text = trim_token_spaces(line.content.byte_slice(colon + 1))
+        key = parse_key_token_value(trim_token_spaces(line.content[0, colon]))
+        cell_text = trim_token_spaces(line.content[colon + 1, line.content.size - colon - 1])
         raise DecodeError.new("Keyed entry row has no cells") if cell_text.empty?
         values = parse_delimited_values(cell_text, delimiter)
         assert_expected_count(values.size, leaf_count, "keyed row values")
