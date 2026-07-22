@@ -4,9 +4,8 @@ module Toon
   module Decoders
     struct KeyToken
       getter value : String
-      getter? quoted : Bool
 
-      def initialize(@value : String, @quoted : Bool)
+      def initialize(@value : String)
       end
     end
 
@@ -40,10 +39,6 @@ module Toon
       def key : String?
         @key_token.try(&.value)
       end
-
-      def key_quoted? : Bool
-        @key_token.try(&.quoted?) || false
-      end
     end
 
     private def parse_array_header_line(content : String) : {ArrayHeader, String?}?
@@ -57,7 +52,7 @@ module Toon
         quote_end = trimmed.index(DOUBLE_QUOTE, 1)
         if quote_end
           # Check if there's a '[' after the quoted section
-          after_quote = trimmed.byte_slice(quote_end + 1).lstrip
+          after_quote = trimmed[quote_end + 1, trimmed.size - quote_end - 1].lstrip
           return unless after_quote.starts_with?('[')
         else
           # Unterminated quote, not an array header
@@ -94,18 +89,18 @@ module Toon
 
       # key can be quoted or unquoted up to '['
       if idx
-        before = rest.byte_slice(0, idx).strip
+        before = rest[0, idx].strip
 
         if !before.empty?
           return if find_unquoted_colon_index(before)
           if before.starts_with?(DOUBLE_QUOTE)
-            key_token = KeyToken.new(parse_string_literal(before), true)
+            key_token = KeyToken.new(parse_string_literal(before))
           else
-            key_token = KeyToken.new(before, false)
+            key_token = KeyToken.new(before)
           end
         end
 
-        rest = rest.byte_slice(idx)
+        rest = rest[idx, rest.size - idx]
       end
 
       # [#?len<opt delim>]...
@@ -139,12 +134,12 @@ module Toon
 
       colon_idx = cursor
 
-      header_seg = rest.byte_slice(0, colon_idx)
-      tail = rest.byte_slice(colon_idx + 1)
+      header_seg = rest[0, colon_idx]
+      tail = rest[colon_idx + 1, rest.size - colon_idx - 1]
 
       # strip [ and ]
       close_idx = header_seg.index(']') || (header_seg.size - 1)
-      inside = header_seg.byte_slice(1, close_idx - 1)
+      inside = header_seg[1, close_idx - 1]
 
       len_and_delim = inside
       len_str = len_and_delim
@@ -153,9 +148,9 @@ module Toon
 
       if marker = len_and_delim.index(':')
         keyed = true
-        len_str = len_and_delim.byte_slice(0, marker)
+        len_str = len_and_delim[0, marker]
         return if len_str != len_str.strip
-        delimiter_part = len_and_delim.byte_slice(marker + 1)
+        delimiter_part = len_and_delim[marker + 1, len_and_delim.size - marker - 1]
         return unless delimiter_part.empty? || delimiter_part == PIPE.to_s || delimiter_part == TAB.to_s
         delim = delimiter_part unless delimiter_part.empty?
       end
@@ -166,7 +161,7 @@ module Toon
 
         if delimiter_char?(last)
           delim = last.to_s
-          len_str = len_and_delim.byte_slice(0, len_and_delim.size - 1)
+          len_str = len_and_delim[0, len_and_delim.size - 1]
         end
       end
 
@@ -182,7 +177,7 @@ module Toon
         close_brace = header_seg.rindex('}')
 
         if close_brace && close_brace > brace_idx
-          inside_fields = header_seg.byte_slice(brace_idx + 1, close_brace - brace_idx - 1)
+          inside_fields = header_seg[brace_idx + 1, close_brace - brace_idx - 1]
           # fields are key-encoded; split respecting quotes using active delimiter (fallback COMMA)
           delim_for_fields = delim || DEFAULT_DELIMITER.to_s
           fields = parse_field_nodes(inside_fields, delim_for_fields)
@@ -231,8 +226,8 @@ module Toon
         return if token.empty?
         if brace = find_unquoted_char_index(token, '{')
           return unless token.ends_with?('}')
-          name_token = token.byte_slice(0, brace)
-          children = parse_field_nodes(token.byte_slice(brace + 1, token.size - brace - 2), delimiter)
+          name_token = token[0, brace]
+          children = parse_field_nodes(token[brace + 1, token.size - brace - 2], delimiter)
           return if children.nil? || children.empty?
           name = name_token.starts_with?(DOUBLE_QUOTE) ? parse_string_literal(name_token) : name_token
           nodes << FieldNode.new(name, children)
@@ -262,12 +257,12 @@ module Toon
           depth -= 1
           return if depth < 0
         elsif ch == delimiter[0] && depth == 0
-          result << trim_token_spaces(value.byte_slice(start, i - start))
+          result << trim_token_spaces(value[start, i - start])
           start = i + 1
         end
       end
       return if depth != 0 || in_quotes
-      result << trim_token_spaces(value.byte_slice(start))
+      result << trim_token_spaces(value[start, value.size - start])
       result
     end
   end
