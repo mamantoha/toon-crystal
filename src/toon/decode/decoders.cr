@@ -12,7 +12,9 @@ module Toon
     def decode_value(input : String, indent : Int32 = 2, strict : Bool = true, expand_paths : ExpandPathsMode = ExpandPathsMode::Off) : JsonValue
       lines, blanks = tokenize_lines(input, indent, strict)
       cursor = LineCursor.new(lines, blanks)
-      decode_value_from_lines(cursor, delimiter: DEFAULT_DELIMITER.to_s, strict: strict, expand_paths: expand_paths)
+      value = decode_value_from_lines(cursor, delimiter: DEFAULT_DELIMITER.to_s, strict: strict, expand_paths: expand_paths)
+      raise DecodeError.new("Unexpected trailing content") if strict && !cursor.at_end?
+      value
     end
 
     private def tokenize_lines(input : String, indent : Int32, strict : Bool) : {Array(ParsedLine), Array(Int32)}
@@ -21,6 +23,11 @@ module Toon
 
       input.each_line.with_index do |raw, i|
         line_number = i + 1
+        raw = raw.chomp('\n').chomp('\r')
+
+        # Comments are removed lexically before blank-line and indentation
+        # processing. Only U+0020 space may precede the marker.
+        next if raw.lstrip(' ').starts_with?('#')
 
         if raw.strip.empty?
           blank_lines << line_number
@@ -49,7 +56,7 @@ module Toon
         # Non-strict: ignore tabs when counting indent (treat as zero-width)
         spaces_count = leading.gsub(/\t+/, "").size
         depth = (spaces_count // indent).to_i
-        content = raw.lstrip
+        content = raw.byte_slice(leading_len)
         result << ParsedLine.new(depth, content, line_number)
       end
 
@@ -62,6 +69,7 @@ module Toon
       return {} of String => JsonValue unless first
 
       if cursor.length == 1 && first.content.strip == "[]"
+        cursor.advance
         return [] of JsonValue
       end
 
@@ -98,6 +106,7 @@ module Toon
       end
 
       if cursor.length == 1 && !key_value_line?(first.content)
+        cursor.advance
         return parse_primitive_token(first.content)
       end
 
@@ -141,6 +150,8 @@ module Toon
           value = decode_array_from_header(header, inline_values, cursor, base_depth, delimiter, strict, expand_paths)
 
           return {key_token, value, base_depth + 1}
+        elsif strict
+          raise DecodeError.new("Keyless array header in object field position")
         end
       end
 
@@ -161,7 +172,7 @@ module Toon
       end
 
       key_token, rest = parse_key_token(content)
-      rest = rest.strip
+      rest = trim_token_spaces(rest)
 
       if rest == "[]"
         return {key_token, [] of JsonValue, base_depth + 1}
@@ -176,6 +187,9 @@ module Toon
           # In regular objects (base_depth is object depth), nested objects are at +1
           # We detect list item context by checking if the previous token was after "- "
           # For now, use the next_line's depth to determine nesting depth
+          if strict && next_line.depth != base_depth + 1
+            raise DecodeError.new("indentation error: depth jump")
+          end
           nested_depth = next_line.depth
           nested = decode_object(cursor, nested_depth, delimiter, strict, expand_paths)
           # Return depth for subsequent fields
@@ -188,10 +202,16 @@ module Toon
       {key_token, parse_primitive_token(rest), base_depth + 1}
     end
 
-    private def decode_array_from_header(header : ArrayHeader, inline_values : String?, cursor : LineCursor, base_depth : Int32, default_delim : String, strict : Bool, expand_paths : ExpandPathsMode) : Array(JsonValue)
+    private def decode_array_from_header(header : ArrayHeader, inline_values : String?, cursor : LineCursor, base_depth : Int32, default_delim : String, strict : Bool, expand_paths : ExpandPathsMode) : JsonValue
       active_delim = header.delimiter || default_delim
 
+      if header.keyed
+        raise DecodeError.new("Inline content after keyed header") if inline_values
+        return decode_keyed_object(header, cursor, base_depth, active_delim, strict)
+      end
+
       if inline_values && !inline_values.strip.empty?
+        raise DecodeError.new("Inline content after tabular header") if header.fields
         values = parse_delimited_values(inline_values, active_delim)
         primitives = values.map { |v| parse_primitive_token(v) }
         assert_expected_count(primitives.size, header.length, "inline array items")
@@ -228,7 +248,7 @@ module Toon
         end
       end
 
-      assert_expected_count(items.size, header.length, "list array items")
+      assert_expected_count(items.size, header.length, "list array items") if strict
 
       # strict: blank lines inside the array are not allowed
       if strict && start_line && end_line
@@ -255,7 +275,9 @@ module Toon
     private def decode_tabular_array(header : ArrayHeader, cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool) : Array(JsonValue)
       objects = [] of JsonValue
       row_depth = base_depth + 1
-      fields = header.fields
+      fields = header.fields || [] of FieldNode
+      validate_unique_fields!(fields) if strict
+      leaf_count = fields.sum(&.leaf_count)
       start_line : Int32? = nil
       end_line : Int32? = nil
 
@@ -268,10 +290,10 @@ module Toon
           start_line = line.line_number if start_line.nil?
           cursor.advance
           values = parse_delimited_values(line.content, delimiter)
-          assert_expected_count(values.size, fields.try(&.size) || 0, "tabular row values")
+          assert_expected_count(values.size, leaf_count, "tabular row values")
           primitives = values.map { |v| parse_primitive_token(v) }
           obj = {} of String => JsonValue
-          fields.try(&.each_with_index { |k, i| obj[k] = primitives[i] })
+          assign_field_values!(obj, fields, primitives, 0)
           objects << obj.as(JsonValue)
           current = cursor.current
           end_line = current.line_number if current
@@ -280,7 +302,7 @@ module Toon
         end
       end
 
-      assert_expected_count(objects.size, header.length, "tabular rows")
+      assert_expected_count(objects.size, header.length, "tabular rows") if strict
 
       # strict: blank lines inside the array are not allowed
       if strict && start_line && end_line
@@ -303,6 +325,69 @@ module Toon
       end
 
       objects
+    end
+
+    private def validate_unique_fields!(fields : Array(FieldNode))
+      seen = Set(String).new
+      fields.each do |field|
+        raise DecodeError.new("Duplicate tabular field '#{field.name}'") if seen.includes?(field.name)
+        seen << field.name
+        validate_unique_fields!(field.children.not_nil!) if field.children
+      end
+    end
+
+    private def decode_keyed_object(header : ArrayHeader, cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool) : Hash(String, JsonValue)
+      object = {} of String => JsonValue
+      fields = header.fields || [] of FieldNode
+      validate_unique_fields!(fields) if strict
+      leaf_count = fields.sum(&.leaf_count)
+      row_depth = base_depth + 1
+      start_line : Int32? = nil
+      end_line : Int32? = nil
+      count = 0
+
+      while count < header.length
+        line = cursor.peek
+        break unless line && line.depth == row_depth
+        start_line ||= line.line_number
+        cursor.advance
+        colon = find_unquoted_colon_index(line.content)
+        raise DecodeError.new("Invalid keyed entry row") unless colon
+        key = parse_key_token_value(trim_token_spaces(line.content.byte_slice(0, colon)))
+        cell_text = trim_token_spaces(line.content.byte_slice(colon + 1))
+        raise DecodeError.new("Keyed entry row has no cells") if cell_text.empty?
+        values = parse_delimited_values(cell_text, delimiter)
+        assert_expected_count(values.size, leaf_count, "keyed row values")
+        row = {} of String => JsonValue
+        assign_field_values!(row, fields, values.map { |v| parse_primitive_token(v) }, 0)
+        raise DecodeError.new("Duplicate entry key '#{key.value}'") if strict && object.has_key?(key.value)
+        object[key.value] = row
+        count += 1
+        end_line = line.line_number
+      end
+
+      assert_expected_count(count, header.length, "keyed rows") if strict
+      if strict && start_line && end_line
+        cursor.blank_lines.each do |line_number|
+          raise DecodeError.new("blank line inside keyed object") if line_number >= start_line && line_number <= end_line
+        end
+      end
+      object
+    end
+
+    private def assign_field_values!(object : Hash(String, JsonValue), fields : Array(FieldNode), values : Array(JsonValue), offset : Int32) : Int32
+      index = offset
+      fields.each do |field|
+        if children = field.children
+          child = {} of String => JsonValue
+          index = assign_field_values!(child, children, values, index)
+          object[field.name] = child
+        else
+          object[field.name] = values[index]
+          index += 1
+        end
+      end
+      index
     end
 
     private def decode_list_item(cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool, expand_paths : ExpandPathsMode) : JsonValue
@@ -329,12 +414,18 @@ module Toon
         return {} of String => JsonValue
       end
 
+      return [] of JsonValue if after_hyphen == "[]"
+
       # Only treat as header when list item starts directly with '[' (no key).
       # Pass an increased base depth so nested rows are parsed at the deeper
       # indentation level used when the header is on the hyphen line.
       if after_hyphen.lstrip.starts_with?('[')
         if parsed = parse_array_header_line(after_hyphen)
           header, inline_values = parsed
+
+          if strict && header.key.nil? && (header.keyed || header.fields)
+            raise DecodeError.new("Keyless structured header cannot be a list item")
+          end
 
           # If the header includes a key (e.g., "users[2]{...}:" on the hyphen
           # line) then rows are expected at base_depth + 2, so pass an

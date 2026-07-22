@@ -8,6 +8,14 @@ module Toon
   module Encoders
     extend self
 
+    private class TabularField
+      getter name : String
+      getter children : Array(TabularField)?
+
+      def initialize(@name : String, @children : Array(TabularField)? = nil)
+      end
+    end
+
     private struct FoldChain
       getter segments : Array(String)
       getter leaf_value : JsonValue
@@ -33,7 +41,12 @@ module Toon
       if value.is_a?(Array)
         encode_array(nil, value.as(Array), writer, 0, options)
       elsif value.is_a?(Hash)
-        encode_object(value.as(Hash(String, JsonValue)), writer, 0, options, options.key_folding_mode.safe?, nil)
+        object = value.as(Hash(String, JsonValue))
+        if fields = detect_keyed_tabular_fields(object)
+          encode_keyed_object(nil, object, fields, writer, 0, options)
+        else
+          encode_object(object, writer, 0, options, options.key_folding_mode.safe?, nil)
+        end
       end
 
       writer.to_s
@@ -170,7 +183,14 @@ module Toon
       elsif value.is_a?(Array)
         encode_array(key, value, writer, depth, options, child_enabled)
       elsif value.is_a?(Hash)
-        nested_keys = value.keys
+        object = value.as(Hash(String, JsonValue))
+
+        if fields = detect_keyed_tabular_fields(object)
+          encode_keyed_object(key, object, fields, writer, depth, options)
+          return
+        end
+
+        nested_keys = object.keys
 
         if nested_keys.empty?
           # Empty object
@@ -178,7 +198,7 @@ module Toon
         else
           writer.push(depth, "#{encoded_key}:")
 
-          encode_object(value.as(Hash(String, JsonValue)), writer, depth + 1, options, child_enabled, child_limit)
+          encode_object(object, writer, depth + 1, options, child_enabled, child_limit)
         end
       end
     end
@@ -262,8 +282,8 @@ module Toon
     end
 
     # Array of objects (tabular format)
-    def encode_array_of_objects_as_tabular(key : String?, rows : Array, header : Array(String), writer : LineWriter, depth : Int32, options : EncodeOptions)
-      header_str = Primitives.format_header(rows.size, key: key, fields: header, delimiter: options.delimiter)
+    def encode_array_of_objects_as_tabular(key : String?, rows : Array, header : Array(TabularField), writer : LineWriter, depth : Int32, options : EncodeOptions)
+      header_str = format_tabular_header(rows.size, key, header, options.delimiter)
       writer.push(depth, header_str)
 
       write_tabular_rows(rows, header, writer, depth + 1, options)
@@ -275,42 +295,102 @@ module Toon
       first_row = rows[0]
       return unless first_row.is_a?(Hash)
 
-      first_keys = first_row.keys
-      return if first_keys.empty?
-
-      if tabular_array?(rows, first_keys)
-        first_keys
-      end
+      fields = build_tabular_fields(first_row)
+      return unless fields
+      fields if rows.all? { |row| row.is_a?(Hash) && tabular_shape?(row, fields) }
     end
 
-    def tabular_array?(rows, header : Array(String))
-      rows.all? do |row|
-        return false unless row.is_a?(Hash)
+    private def build_tabular_fields(row : Hash) : Array(TabularField)?
+      return if row.empty?
 
-        keys = row.keys
+      fields = [] of TabularField
+      row.each do |key, value|
+        if Normalizer.json_primitive?(value)
+          fields << TabularField.new(key)
+        elsif value.is_a?(Hash) && (children = build_tabular_fields(value))
+          fields << TabularField.new(key, children)
+        else
+          return
+        end
+      end
+      fields
+    end
 
-        # All objects must have the same keys (but order can differ)
-        return false if keys.size != header.size
-
-        # Check that all header keys exist in the row and all values are primitives
-        header.all? do |key|
-          row.has_key?(key) && Normalizer.json_primitive?(row[key])
+    private def tabular_shape?(row : Hash, fields : Array(TabularField)) : Bool
+      return false unless row.size == fields.size
+      fields.all? do |field|
+        next false unless row.has_key?(field.name)
+        value = row[field.name]
+        if children = field.children
+          value.is_a?(Hash) && tabular_shape?(value, children)
+        else
+          Normalizer.json_primitive?(value)
         end
       end
     end
 
-    def write_tabular_rows(rows, header : Array(String), writer : LineWriter, depth : Int32, options : EncodeOptions)
+    private def format_tabular_fields(fields : Array(TabularField), delimiter : String) : String
+      fields.map do |field|
+        name = Primitives.encode_key(field.name)
+        if children = field.children
+          "#{name}{#{format_tabular_fields(children, delimiter)}}"
+        else
+          name
+        end
+      end.join(delimiter)
+    end
+
+    private def format_tabular_header(length : Int32, key : String?, fields : Array(TabularField), delimiter : String, keyed : Bool = false) : String
+      prefix = key ? Primitives.encode_key(key) : ""
+      delimiter_suffix = delimiter == DEFAULT_DELIMITER.to_s ? "" : delimiter
+      marker = keyed ? ":" : ""
+      "#{prefix}[#{length}#{marker}#{delimiter_suffix}]{#{format_tabular_fields(fields, delimiter)}}:"
+    end
+
+    private def flattened_values(row : Hash, fields : Array(TabularField)) : Array(JsonValue)
+      values = [] of JsonValue
+      fields.each do |field|
+        value = row[field.name]
+        if children = field.children
+          values.concat(flattened_values(value.as(Hash), children))
+        else
+          values << value.as(JsonValue)
+        end
+      end
+      values
+    end
+
+    def write_tabular_rows(rows, header : Array(TabularField), writer : LineWriter, depth : Int32, options : EncodeOptions)
       rows.each do |row|
         next unless row.is_a?(Hash)
 
-        values = header.map { |key| row[key] }
+        values = flattened_values(row, header)
         joined_value = Primitives.join_encoded_values(values, options.delimiter)
         writer.push(depth, joined_value)
       end
     end
 
-    private def emit_tabular_header_and_rows(writer : LineWriter, header_depth : Int32, row_depth : Int32, key : String?, rows : Array, header : Array(String), options : EncodeOptions, include_list_prefix : Bool = false)
-      header_str = Primitives.format_header(rows.size, key: key, fields: header, delimiter: options.delimiter)
+    private def detect_keyed_tabular_fields(object : Hash(String, JsonValue)) : Array(TabularField)?
+      return if object.size < 2
+      first = object[object.keys.first]
+      return unless first.is_a?(Hash)
+      fields = build_tabular_fields(first)
+      return unless fields
+      fields if object.all? { |_key, value| value.is_a?(Hash) && tabular_shape?(value, fields) }
+    end
+
+    private def encode_keyed_object(key : String?, object : Hash(String, JsonValue), fields : Array(TabularField), writer : LineWriter, depth : Int32, options : EncodeOptions, list_item : Bool = false)
+      header = format_tabular_header(object.size, key, fields, options.delimiter, keyed: true)
+      writer.push(depth, list_item ? "#{LIST_ITEM_PREFIX}#{header}" : header)
+      row_depth = depth + (list_item ? 2 : 1)
+      object.each do |entry_key, value|
+        cells = Primitives.join_encoded_values(flattened_values(value.as(Hash), fields), options.delimiter)
+        writer.push(row_depth, "#{Primitives.encode_key(entry_key)}: #{cells}")
+      end
+    end
+
+    private def emit_tabular_header_and_rows(writer : LineWriter, header_depth : Int32, row_depth : Int32, key : String?, rows : Array, header : Array(TabularField), options : EncodeOptions, include_list_prefix : Bool = false)
+      header_str = format_tabular_header(rows.size, key, header, options.delimiter)
 
       if include_list_prefix
         writer.push(header_depth, "#{LIST_ITEM_PREFIX}#{header_str}")
@@ -399,6 +479,15 @@ module Toon
             return
           end
         end
+      end
+
+      if first_fields = detect_keyed_tabular_fields(obj[keys.first].as?(Hash(String, JsonValue)) || ({} of String => JsonValue))
+        first_key = keys.first
+        encode_keyed_object(first_key, obj[first_key].as(Hash(String, JsonValue)), first_fields, writer, depth, options, list_item: true)
+        keys[1..].each do |key|
+          emit_key_value_pair(key, obj[key], writer, depth + 1, options, folding_enabled, chain_limit)
+        end
+        return
       end
 
       # First key-value on the same line as "- " when possible (compact form)

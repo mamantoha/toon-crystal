@@ -143,8 +143,8 @@ module FixtureHelper
 
   # Get indent from options
   def get_indent(options : Hash(String, JSON::Any)) : Int32
-    if options.has_key?("indent")
-      options["indent"].as_i64.to_i32
+    if options.has_key?("indentSize")
+      options["indentSize"].as_i64.to_i32
     else
       2
     end

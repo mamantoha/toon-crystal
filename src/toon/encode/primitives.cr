@@ -103,6 +103,7 @@ module Toon
       return false if padded_with_whitespace?(value)
       return false if value == TRUE_LITERAL || value == FALSE_LITERAL || value == NULL_LITERAL
       return false if numeric_like?(value)
+      return false if value.starts_with?('#')
       return false if value.includes?(COLON)
       return false if value.includes?(DOUBLE_QUOTE) || value.includes?('\\')
       return false if value =~ /[\[\]{}]/
@@ -115,7 +116,7 @@ module Toon
 
     def numeric_like?(value : String)
       # Match numbers like: 42, -3.14, 1e-6, 05, etc.
-      value =~ /^-?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i || value =~ /^0\d+$/
+      value =~ /^[+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i || value =~ /^[+-]?0\d+$/
     end
 
     def integer_like?(value : Float)
