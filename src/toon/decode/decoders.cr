@@ -9,10 +9,10 @@ module Toon
     extend self
 
     # decode TOON string into Crystal JSON-like values
-    def decode_value(input : String, indent : Int32 = 2, strict : Bool = true, expand_paths : ExpandPathsMode = ExpandPathsMode::Off) : JsonValue
+    def decode_value(input : String, indent : Int32 = 2, strict : Bool = true) : JsonValue
       lines, blanks = tokenize_lines(input, indent, strict)
       cursor = LineCursor.new(lines, blanks)
-      value = decode_value_from_lines(cursor, delimiter: DEFAULT_DELIMITER.to_s, strict: strict, expand_paths: expand_paths)
+      value = decode_value_from_lines(cursor, delimiter: DEFAULT_DELIMITER.to_s, strict: strict)
       raise DecodeError.new("Unexpected trailing content") if strict && !cursor.at_end?
       value
     end
@@ -63,7 +63,7 @@ module Toon
       {result, blank_lines}
     end
 
-    private def decode_value_from_lines(cursor : LineCursor, delimiter : String, strict : Bool, expand_paths : ExpandPathsMode) : JsonValue
+    private def decode_value_from_lines(cursor : LineCursor, delimiter : String, strict : Bool) : JsonValue
       first = cursor.peek
       # Empty document decodes to empty object
       return {} of String => JsonValue unless first
@@ -80,7 +80,7 @@ module Toon
           # Treat as object field; decode via object path to allow following fields
         else
           cursor.advance
-          value = decode_array_from_header(header, inline_values, cursor, first.depth, delimiter, strict, expand_paths)
+          value = decode_array_from_header(header, inline_values, cursor, first.depth, delimiter, strict)
 
           return value
         end
@@ -98,7 +98,7 @@ module Toon
           else
             inline_values = first.content[colon_idx + 1, first.content.size - (colon_idx + 1)]
             cursor.advance
-            value = decode_array_from_header(header2, inline_values, cursor, first.depth, delimiter, strict, expand_paths)
+            value = decode_array_from_header(header2, inline_values, cursor, first.depth, delimiter, strict)
 
             return value
           end
@@ -110,10 +110,10 @@ module Toon
         return parse_primitive_token(first.content)
       end
 
-      decode_object(cursor, first.depth, delimiter, strict, expand_paths)
+      decode_object(cursor, first.depth, delimiter, strict)
     end
 
-    private def decode_object(cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool, expand_paths : ExpandPathsMode) : JsonValue
+    private def decode_object(cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool) : JsonValue
       obj = {} of String => JsonValue
 
       until cursor.at_end?
@@ -122,8 +122,8 @@ module Toon
         break unless line && line.depth >= base_depth
 
         if line.depth == base_depth
-          key_token, value = decode_key_value_pair(line, cursor, base_depth, delimiter, strict, expand_paths)
-          insert_key!(obj, key_token, value, strict, expand_paths)
+          key_token, value = decode_key_value_pair(line, cursor, base_depth, delimiter, strict)
+          insert_key!(obj, key_token, value, strict)
         else
           break
         end
@@ -132,14 +132,14 @@ module Toon
       obj
     end
 
-    private def decode_key_value_pair(line : ParsedLine, cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool, expand_paths : ExpandPathsMode) : {KeyToken, JsonValue}
+    private def decode_key_value_pair(line : ParsedLine, cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool) : {KeyToken, JsonValue}
       cursor.advance
-      key_token, value, _follow = decode_key_value(line.content, cursor, base_depth, delimiter, strict, expand_paths)
+      key_token, value, _follow = decode_key_value(line.content, cursor, base_depth, delimiter, strict)
 
       {key_token, value}
     end
 
-    private def decode_key_value(content : String, cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool, expand_paths : ExpandPathsMode) : {KeyToken, JsonValue, Int32}
+    private def decode_key_value(content : String, cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool) : {KeyToken, JsonValue, Int32}
       validate_malformed_array_header_strict!(content, strict)
 
       # Array header with key
@@ -147,7 +147,7 @@ module Toon
         header, inline_values = parsed
 
         if key_token = header.key_token
-          value = decode_array_from_header(header, inline_values, cursor, base_depth, delimiter, strict, expand_paths)
+          value = decode_array_from_header(header, inline_values, cursor, base_depth, delimiter, strict)
 
           return {key_token, value, base_depth + 1}
         elsif strict
@@ -164,7 +164,7 @@ module Toon
 
           if key_token2 = header2.key_token
             inline_values = content[colon_idx + 1, content.size - (colon_idx + 1)]
-            value = decode_array_from_header(header2, inline_values, cursor, base_depth, delimiter, strict, expand_paths)
+            value = decode_array_from_header(header2, inline_values, cursor, base_depth, delimiter, strict)
 
             return {key_token2, value, base_depth + 1}
           end
@@ -191,7 +191,7 @@ module Toon
             raise DecodeError.new("indentation error: depth jump")
           end
           nested_depth = next_line.depth
-          nested = decode_object(cursor, nested_depth, delimiter, strict, expand_paths)
+          nested = decode_object(cursor, nested_depth, delimiter, strict)
           # Return depth for subsequent fields
           return {key_token, nested, nested_depth}
         end
@@ -202,7 +202,7 @@ module Toon
       {key_token, parse_primitive_token(rest), base_depth + 1}
     end
 
-    private def decode_array_from_header(header : ArrayHeader, inline_values : String?, cursor : LineCursor, base_depth : Int32, default_delim : String, strict : Bool, expand_paths : ExpandPathsMode) : JsonValue
+    private def decode_array_from_header(header : ArrayHeader, inline_values : String?, cursor : LineCursor, base_depth : Int32, default_delim : String, strict : Bool) : JsonValue
       active_delim = header.delimiter || default_delim
 
       if header.keyed?
@@ -223,10 +223,10 @@ module Toon
         return decode_tabular_array(header, cursor, base_depth, active_delim, strict)
       end
 
-      decode_list_array(header, cursor, base_depth, active_delim, strict, expand_paths)
+      decode_list_array(header, cursor, base_depth, active_delim, strict)
     end
 
-    private def decode_list_array(header : ArrayHeader, cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool, expand_paths : ExpandPathsMode) : Array(JsonValue)
+    private def decode_list_array(header : ArrayHeader, cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool) : Array(JsonValue)
       items = [] of JsonValue
       item_depth = base_depth + 1
       start_line : Int32? = nil
@@ -240,7 +240,7 @@ module Toon
         # Handle both "- " (with space) and "-" (empty item)
         if line.depth == item_depth && (line.content.starts_with?(LIST_ITEM_PREFIX) || line.content == "-")
           start_line = line.line_number if start_line.nil?
-          items << decode_list_item(cursor, item_depth, delimiter, strict, expand_paths)
+          items << decode_list_item(cursor, item_depth, delimiter, strict)
           current = cursor.current
           end_line = current.line_number if current
         else
@@ -392,7 +392,7 @@ module Toon
       index
     end
 
-    private def decode_list_item(cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool, expand_paths : ExpandPathsMode) : JsonValue
+    private def decode_list_item(cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool) : JsonValue
       line = cursor.next
 
       raise DecodeError.new("Expected list item") unless line
@@ -403,7 +403,7 @@ module Toon
       if line.content == "-"
         next_line = cursor.peek
         if next_line && next_line.depth > base_depth
-          return decode_object(cursor, next_line.depth, delimiter, strict, expand_paths)
+          return decode_object(cursor, next_line.depth, delimiter, strict)
         end
 
         return {} of String => JsonValue
@@ -435,28 +435,28 @@ module Toon
           # items are list items at base_depth + 1, so pass the unchanged
           # base_depth.
           if header.key
-            return decode_array_from_header(header, inline_values, cursor, base_depth + 1, delimiter, strict, expand_paths)
+            return decode_array_from_header(header, inline_values, cursor, base_depth + 1, delimiter, strict)
           else
-            return decode_array_from_header(header, inline_values, cursor, base_depth, delimiter, strict, expand_paths)
+            return decode_array_from_header(header, inline_values, cursor, base_depth, delimiter, strict)
           end
         end
       end
 
       if object_field_after_hyphen?(after_hyphen)
-        return decode_object_from_list_item(line, cursor, base_depth, delimiter, strict, expand_paths)
+        return decode_object_from_list_item(line, cursor, base_depth, delimiter, strict)
       end
 
       parse_primitive_token(after_hyphen)
     end
 
-    private def decode_object_from_list_item(first_line : ParsedLine, cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool, expand_paths : ExpandPathsMode) : Hash(String, JsonValue)
+    private def decode_object_from_list_item(first_line : ParsedLine, cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool) : Hash(String, JsonValue)
       after_hyphen = first_line.content.byte_slice(LIST_ITEM_PREFIX.size)
       # When decoding the first field of a list-item object, treat array headers
       # as if they are nested one level deeper (the hyphen line contains the
       # header), so pass an increased base depth to `decode_key_value`.
-      key_token, value, _follow = decode_key_value(after_hyphen, cursor, base_depth + 1, delimiter, strict, expand_paths)
+      key_token, value, _follow = decode_key_value(after_hyphen, cursor, base_depth + 1, delimiter, strict)
       obj = {} of String => JsonValue
-      insert_key!(obj, key_token, value, strict, expand_paths)
+      insert_key!(obj, key_token, value, strict)
 
       # If the first field was a nested object (- key:), nested fields are at +2, subsequent fields at +1
       # follow_depth is the depth returned by decode_key_value for nested objects
@@ -468,128 +468,16 @@ module Toon
         break unless line && line.depth == subsequent_depth
         break if line.content.starts_with?(LIST_ITEM_PREFIX)
 
-        k_token, v = decode_key_value_pair(line, cursor, subsequent_depth, delimiter, strict, expand_paths)
-        insert_key!(obj, k_token, v, strict, expand_paths)
+        k_token, v = decode_key_value_pair(line, cursor, subsequent_depth, delimiter, strict)
+        insert_key!(obj, k_token, v, strict)
       end
 
       obj
     end
 
-    private def insert_key!(obj : Hash(String, JsonValue), token : KeyToken, value : JsonValue, strict : Bool, expand_paths : ExpandPathsMode)
-      if expand_paths.safe? && !token.quoted? && eligible_for_path_expansion?(token.value)
-        segments = token.value.split('.')
-        expand_path_into!(obj, segments, value, strict, expand_paths)
-      else
-        assign_key!(obj, token.value, value, strict, expand_paths, token.value)
-      end
-    end
-
-    private def eligible_for_path_expansion?(key : String) : Bool
-      return false unless key.includes?('.')
-      segments = key.split('.')
-      return false if segments.empty?
-      segments.all? { |segment| !segment.empty? && IDENTIFIER_SEGMENT_REGEX =~ segment }
-    end
-
-    private def expand_path_into!(obj : Hash(String, JsonValue), segments : Array(String), value : JsonValue, strict : Bool, expand_paths : ExpandPathsMode)
-      current = obj
-      path_parts = [] of String
-
-      segments.each_with_index do |segment, index|
-        path_parts << segment
-        path = path_parts.join('.')
-
-        if index == segments.size - 1
-          assign_key!(current, segment, value, strict, expand_paths, path)
-        else
-          existing = current[segment]?
-
-          if existing.is_a?(Hash(String, JsonValue))
-            current = existing
-          elsif existing.nil?
-            new_obj = {} of String => JsonValue
-            current[segment] = new_obj
-            current = new_obj
-          else
-            if strict
-              raise DecodeError.new("Expansion conflict at path '#{path}' (expected object, found #{structural_kind_label(existing)})")
-            else
-              new_obj = {} of String => JsonValue
-              current[segment] = new_obj
-              current = new_obj
-            end
-          end
-        end
-      end
-    end
-
-    private def assign_key!(obj : Hash(String, JsonValue), key : String, value : JsonValue, strict : Bool, expand_paths : ExpandPathsMode, path : String)
-      if strict && obj.has_key?(key)
-        raise DecodeError.new("Duplicate key '#{path}'")
-      end
-
-      if expand_paths.safe? && obj.has_key?(key)
-        existing = obj[key]
-
-        if existing.is_a?(Hash(String, JsonValue)) && value.is_a?(Hash(String, JsonValue))
-          deep_merge_objects!(existing, value, strict, expand_paths, path)
-          return
-        end
-
-        if strict && structural_conflict?(existing, value)
-          raise DecodeError.new("Expansion conflict at path '#{path}' (#{structural_kind_label(existing)} vs #{structural_kind_label(value)})")
-        end
-      end
-
-      obj[key] = value
-    end
-
-    private def deep_merge_objects!(target : Hash(String, JsonValue), source : Hash(String, JsonValue), strict : Bool, expand_paths : ExpandPathsMode, path : String)
-      source.each do |k, v|
-        child_path = path.empty? ? k : "#{path}.#{k}"
-        assign_key!(target, k, v, strict, expand_paths, child_path)
-      end
-    end
-
-    private def structural_conflict?(existing : JsonValue, value : JsonValue) : Bool
-      existing_kind = structural_kind(existing)
-      value_kind = structural_kind(value)
-
-      return false if existing_kind == value_kind && existing_kind != :object
-
-      existing_kind != value_kind
-    end
-
-    private def structural_kind(value : JsonValue)
-      case value
-      when Hash(String, JsonValue)
-        :object
-      when Array(JsonValue)
-        :array
-      else
-        :primitive
-      end
-    end
-
-    private def structural_kind_label(value : JsonValue) : String
-      case value
-      when Hash(String, JsonValue)
-        "object"
-      when Array(JsonValue)
-        "array"
-      when String
-        "string"
-      when Int64
-        "integer"
-      when Float64
-        "float"
-      when Bool
-        "boolean"
-      when Nil
-        "null"
-      else
-        "value"
-      end
+    private def insert_key!(obj : Hash(String, JsonValue), token : KeyToken, value : JsonValue, strict : Bool)
+      raise DecodeError.new("Duplicate key '#{token.value}'") if strict && obj.has_key?(token.value)
+      obj[token.value] = value
     end
 
     private def parse_key_token(content : String) : {KeyToken, String}
@@ -622,9 +510,9 @@ module Toon
 
     private def parse_key_token_value(raw : String) : KeyToken
       if raw.starts_with?(DOUBLE_QUOTE)
-        KeyToken.new(parse_string_literal(raw), true)
+        KeyToken.new(parse_string_literal(raw))
       else
-        KeyToken.new(raw, false)
+        KeyToken.new(raw)
       end
     end
 

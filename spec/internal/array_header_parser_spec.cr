@@ -27,7 +27,6 @@ describe "TOON decode array header parser" do
 
     header, inline_values = parsed.not_nil!
     header.key.should eq("user.name")
-    header.key_quoted?.should be_true
     header.length.should eq(3)
     header.delimiter.should eq("|")
     header.fields.should eq(["id", "name"])

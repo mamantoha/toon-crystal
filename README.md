@@ -73,7 +73,7 @@ value = Toon.decode(toon)
 
 ## API
 
-### `Toon.encode(value, *, indent = 2, delimiter = ',', key_folding = KeyFoldingMode::Off, flatten_depth = nil)`
+### `Toon.encode(value, *, indent = 2, delimiter = ',')`
 
 Converts any value to TOON format.
 
@@ -82,8 +82,6 @@ Converts any value to TOON format.
 - `value` – Any value to encode (Hash, Array, primitives, or nested structures)
 - `indent` – Number of spaces per indentation level (default: `2`)
 - `delimiter` – Delimiter for array values and tabular rows: `','`, `'\t'`, or `'|'` (default: `','`)
-- `key_folding` – Optional key folding mode (`KeyFoldingMode::Off` | `KeyFoldingMode::Safe`), defaults to `Off`
-- `flatten_depth` – Optional max number of segments to fold when `key_folding` is `Safe` (default: Infinity when `nil`)
 
 **Returns:**
 
@@ -95,14 +93,6 @@ A TOON-formatted string with no trailing newline or spaces.
 # Basic usage
 Toon.encode({ "id" => 1, "name" => "Ada" })
 # => "id: 1\nname: Ada"
-
-# Key folding (safe)
-Toon.encode({ "a" => { "b" => { "c" => 1 } } }, key_folding: :safe)
-# => "a.b.c: 1"
-
-# Key folding with flattenDepth
-Toon.encode({ "a" => { "b" => { "c" => 1 } } }, key_folding: :safe, flatten_depth: 2)
-# => "a.b:\n  c: 1"
 
 # Tabular arrays
 items = [
@@ -117,7 +107,7 @@ Toon.encode({ "items" => items }, delimiter: '\t')
 # => "items[2	]{sku	qty	price}:\n  A1\t2\t9.99\n  B2\t1\t14.5"
 ```
 
-### `Toon.decode(input, *, indent = 2, strict = true, expand_paths = ExpandPathsMode::Off)`
+### `Toon.decode(input, *, indent = 2, strict = true)`
 
 Parses a TOON-formatted string into native Crystal values.
 
@@ -126,7 +116,6 @@ Parses a TOON-formatted string into native Crystal values.
 - `input` – TOON-formatted string
 - `indent` – Number of spaces per indentation level (default: `2`)
 - `strict` – Enable validations for indentation, tabs, blank lines, and extra rows/items (default: `true`)
-- `expand_paths` – Optional path expansion mode (`ExpandPathsMode::Off` | `ExpandPathsMode::Safe`) to split dotted keys into nested objects (default: `Off`)
 
 **Returns:**
 
@@ -144,9 +133,6 @@ Toon.decode("[2]{id}:\n  1\n  2")
 Toon.decode("items[2]:\n  - id: 1\n    name: First\n  - id: 2\n    name: Second")
 # => {"items" => [{"id" => 1, "name" => "First"}, {"id" => 2, "name" => "Second"}]}
 
-# Path expansion (safe)
-Toon.decode("a.b.c: 1", expand_paths: :safe)
-# => {"a" => {"b" => {"c" => 1}}}
 ```
 
 ## Development

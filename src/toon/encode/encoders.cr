@@ -16,20 +16,6 @@ module Toon
       end
     end
 
-    private struct FoldChain
-      getter segments : Array(String)
-      getter leaf_value : JsonValue
-      getter stop : Symbol
-      getter collision_key : String?
-
-      def initialize(@segments : Array(String), @leaf_value : JsonValue, @stop : Symbol, @collision_key : String? = nil)
-      end
-
-      def folded_key : String
-        segments.join('.')
-      end
-    end
-
     # Encode normalized value
     def encode_value(value, options : EncodeOptions)
       if Normalizer.json_primitive?(value)
@@ -45,7 +31,7 @@ module Toon
         if fields = detect_keyed_tabular_fields(object)
           encode_keyed_object(nil, object, fields, writer, 0, options)
         else
-          encode_object(object, writer, 0, options, options.key_folding_mode.safe?, nil)
+          encode_object(object, writer, 0, options)
         end
       end
 
@@ -53,135 +39,19 @@ module Toon
     end
 
     # Object encoding
-    def encode_object(value : Hash(String, JsonValue), writer : LineWriter, depth : Int32, options : EncodeOptions, folding_enabled : Bool = options.key_folding_mode.safe?, chain_limit : Int32? = nil)
-      keys = value.keys
-
-      keys.each do |key|
-        raw_value = value[key]
-        folded_key, folded_value, child_enabled, child_limit = maybe_fold_key(key, raw_value, value, options, folding_enabled, chain_limit)
-        emit_key_value_pair(folded_key, folded_value, writer, depth, options, child_enabled, child_limit)
+    def encode_object(value : Hash(String, JsonValue), writer : LineWriter, depth : Int32, options : EncodeOptions)
+      value.each do |key, item|
+        emit_key_value_pair(key, item, writer, depth, options)
       end
     end
 
-    private def maybe_fold_key(key : String, value : JsonValue, parent : Hash(String, JsonValue), options : EncodeOptions, folding_enabled : Bool, chain_limit : Int32?) : {String, JsonValue, Bool, Int32?}
-      return {key, value, false, nil} unless folding_enabled
-
-      limit = chain_limit || options.flatten_limit
-      return {key, value, false, nil} if limit < 2
-      return {key, value, folding_enabled, nil} unless foldable_segment?(key)
-
-      chain = walk_fold_chain(key, value, parent, limit)
-      folded_key = chain.folded_key
-
-      if chain.segments.size == 1 && chain.stop == :unfoldable
-        return {key, value, folding_enabled, nil}
-      end
-
-      if chain.collision_key && parent.has_key?(chain.collision_key)
-        return {key, value, false, nil}
-      end
-
-      child_enabled, child_limit = child_fold_options(chain, limit, folding_enabled)
-      {folded_key, chain.leaf_value, child_enabled, child_limit}
-    end
-
-    private def walk_fold_chain(key : String, value : JsonValue, parent : Hash(String, JsonValue), limit : Int32) : FoldChain
-      segments = [key]
-      current_value = value
-      stop : Symbol = :start
-      collision_key : String? = nil
-
-      while segments.size < limit
-        unless current_value.is_a?(Hash(String, JsonValue))
-          stop = :leaf
-          break
-        end
-
-        child_hash = current_value.as(Hash(String, JsonValue))
-        child_keys = child_hash.keys
-
-        if child_keys.size != 1
-          stop = :branch
-          break
-        end
-
-        next_key = child_keys.first
-        unless foldable_segment?(next_key)
-          stop = :unfoldable
-          break
-        end
-
-        candidate_segments = segments + [next_key]
-        folded_candidate = candidate_segments.join('.')
-
-        if parent.has_key?(folded_candidate)
-          stop = :unfoldable
-          collision_key = folded_candidate
-          break
-        end
-
-        segments << next_key
-        current_value = child_hash[next_key]
-        stop = :continued
-      end
-
-      if segments.size == limit && current_value.is_a?(Hash(String, JsonValue))
-        stop = :limit
-      end
-
-      FoldChain.new(segments, current_value, stop, collision_key)
-    end
-
-    private def child_fold_options(chain : FoldChain, limit : Int32, folding_enabled : Bool) : {Bool, Int32?}
-      child_enabled = folding_enabled
-      child_limit : Int32? = nil
-
-      if chain.segments.size == 1
-        case chain.stop
-        when :unfoldable, :limit
-          child_enabled = false
-        else
-          child_enabled = folding_enabled
-        end
-
-        return {child_enabled, nil}
-      end
-
-      if chain.leaf_value.is_a?(Hash(String, JsonValue))
-        case chain.stop
-        when :limit, :unfoldable
-          child_enabled = false
-        when :branch
-          child_enabled = folding_enabled
-          child_limit = nil
-        else
-          remaining = limit - chain.segments.size
-
-          if remaining >= 2
-            child_limit = remaining
-          else
-            child_enabled = false
-          end
-        end
-      else
-        child_enabled = folding_enabled
-        child_limit = nil
-      end
-
-      {child_enabled, child_limit}
-    end
-
-    private def foldable_segment?(segment : String) : Bool
-      IDENTIFIER_SEGMENT_REGEX.matches?(segment)
-    end
-
-    private def emit_key_value_pair(key : String, value, writer : LineWriter, depth : Int32, options : EncodeOptions, child_enabled : Bool, child_limit : Int32?)
+    private def emit_key_value_pair(key : String, value, writer : LineWriter, depth : Int32, options : EncodeOptions)
       encoded_key = Primitives.encode_key(key)
 
       if Normalizer.json_primitive?(value)
         writer.push(depth, "#{encoded_key}: #{Primitives.encode_primitive(value, options.delimiter)}")
       elsif value.is_a?(Array)
-        encode_array(key, value, writer, depth, options, child_enabled)
+        encode_array(key, value, writer, depth, options)
       elsif value.is_a?(Hash)
         object = value.as(Hash(String, JsonValue))
 
@@ -198,13 +68,13 @@ module Toon
         else
           writer.push(depth, "#{encoded_key}:")
 
-          encode_object(object, writer, depth + 1, options, child_enabled, child_limit)
+          encode_object(object, writer, depth + 1, options)
         end
       end
     end
 
     # Array encoding
-    def encode_array(key : String?, value : Array, writer : LineWriter, depth : Int32, options : EncodeOptions, folding_enabled : Bool = options.key_folding_mode.safe?)
+    def encode_array(key : String?, value : Array, writer : LineWriter, depth : Int32, options : EncodeOptions)
       if value.empty?
         if key
           writer.push(depth, "#{Primitives.encode_key(key)}: []")
@@ -240,14 +110,14 @@ module Toon
         if header
           encode_array_of_objects_as_tabular(key, value, header, writer, depth, options)
         else
-          encode_mixed_array_as_list_items(key, value, writer, depth, options, folding_enabled)
+          encode_mixed_array_as_list_items(key, value, writer, depth, options)
         end
 
         return
       end
 
       # Mixed array: fallback to expanded format
-      encode_mixed_array_as_list_items(key, value, writer, depth, options, folding_enabled)
+      encode_mixed_array_as_list_items(key, value, writer, depth, options)
     end
 
     # Primitive array encoding (inline)
@@ -423,7 +293,7 @@ module Toon
     end
 
     # Array of objects (expanded format)
-    def encode_mixed_array_as_list_items(key : String?, items : Array, writer : LineWriter, depth : Int32, options : EncodeOptions, folding_enabled : Bool = options.key_folding_mode.safe?)
+    def encode_mixed_array_as_list_items(key : String?, items : Array, writer : LineWriter, depth : Int32, options : EncodeOptions)
       header = Primitives.format_header(items.size, key: key, delimiter: options.delimiter)
       writer.push(depth, header)
 
@@ -444,18 +314,18 @@ module Toon
             item.each do |sub|
               if sub.is_a?(Hash)
                 # encode inner objects as list items, with increased depth
-                encode_object_as_list_item(sub.as(Hash(String, JsonValue)), writer, depth + 2, options, folding_enabled)
+                encode_object_as_list_item(sub.as(Hash(String, JsonValue)), writer, depth + 2, options)
               end
             end
           end
         elsif item.is_a?(Hash)
           # Object as list item
-          encode_object_as_list_item(item, writer, depth + 1, options, folding_enabled)
+          encode_object_as_list_item(item, writer, depth + 1, options)
         end
       end
     end
 
-    def encode_object_as_list_item(obj : Hash(String, JsonValue), writer : LineWriter, depth : Int32, options : EncodeOptions, folding_enabled : Bool = options.key_folding_mode.safe?, chain_limit : Int32? = nil)
+    def encode_object_as_list_item(obj : Hash(String, JsonValue), writer : LineWriter, depth : Int32, options : EncodeOptions)
       keys = obj.keys
 
       if keys.empty?
@@ -469,13 +339,12 @@ module Toon
       # the same hyphen line (e.g., "- key[2]: 1,2" or "- key[2]{a,b}:\n  1,2").
       if keys.size == 1
         only_key = keys.first
-        raw = obj[only_key]
-        folded_key, folded_value, child_enabled, child_limit = maybe_fold_key(only_key, raw, obj, options, folding_enabled, chain_limit)
+        value = obj[only_key]
 
-        if folded_value.is_a?(Array)
-          arr = folded_value.as(Array)
+        if value.is_a?(Array)
+          arr = value.as(Array)
 
-          if try_emit_compact_array_list_item(writer, depth, folded_key, arr, options)
+          if try_emit_compact_array_list_item(writer, depth, only_key, arr, options)
             return
           end
         end
@@ -485,23 +354,22 @@ module Toon
         first_key = keys.first
         encode_keyed_object(first_key, obj[first_key].as(Hash(String, JsonValue)), first_fields, writer, depth, options, list_item: true)
         keys[1..].each do |key|
-          emit_key_value_pair(key, obj[key], writer, depth + 1, options, folding_enabled, chain_limit)
+          emit_key_value_pair(key, obj[key], writer, depth + 1, options)
         end
         return
       end
 
       # First key-value on the same line as "- " when possible (compact form)
       first_key = keys.first
-      folded_first_key, folded_first_value, first_child_enabled, first_child_limit = maybe_fold_key(first_key, obj[first_key], obj, options, folding_enabled, chain_limit)
-      encoded_key = Primitives.encode_key(folded_first_key)
-      first_value = folded_first_value
+      encoded_key = Primitives.encode_key(first_key)
+      first_value = obj[first_key]
 
       if Normalizer.json_primitive?(first_value)
         writer.push(depth, "#{LIST_ITEM_PREFIX}#{encoded_key}: #{Primitives.encode_primitive(first_value, options.delimiter)}")
       elsif first_value.is_a?(Array)
         arr = first_value
 
-        if try_emit_compact_array_list_item(writer, depth, folded_first_key, arr, options)
+        if try_emit_compact_array_list_item(writer, depth, first_key, arr, options)
           # compact form emitted
         else
           if Normalizer.array_of_objects?(arr)
@@ -510,7 +378,7 @@ module Toon
 
             arr.each do |item|
               if item.is_a?(Hash)
-                encode_object_as_list_item(item.as(Hash(String, JsonValue)), writer, depth + 2, options, first_child_enabled)
+                encode_object_as_list_item(item.as(Hash(String, JsonValue)), writer, depth + 2, options)
               end
             end
           else
@@ -525,7 +393,7 @@ module Toon
                 inline = format_inline_array(item, options.delimiter, nil)
                 writer.push(depth + 2, "#{LIST_ITEM_PREFIX}#{inline}")
               elsif item.is_a?(Hash)
-                encode_object_as_list_item(item.as(Hash(String, JsonValue)), writer, depth + 2, options, first_child_enabled)
+                encode_object_as_list_item(item.as(Hash(String, JsonValue)), writer, depth + 2, options)
               end
             end
           end
@@ -537,15 +405,13 @@ module Toon
           writer.push(depth, "#{LIST_ITEM_PREFIX}#{encoded_key}:")
         else
           writer.push(depth, "#{LIST_ITEM_PREFIX}#{encoded_key}:")
-          encode_object(first_value.as(Hash(String, JsonValue)), writer, depth + 2, options, first_child_enabled, first_child_limit)
+          encode_object(first_value.as(Hash(String, JsonValue)), writer, depth + 2, options)
         end
       end
 
       # Remaining keys on indented lines
       keys[1..].each do |key|
-        raw = obj[key]
-        folded_key, folded_value, child_enabled, child_limit = maybe_fold_key(key, raw, obj, options, folding_enabled, chain_limit)
-        emit_key_value_pair(folded_key, folded_value, writer, depth + 1, options, child_enabled, child_limit)
+        emit_key_value_pair(key, obj[key], writer, depth + 1, options)
       end
     end
   end

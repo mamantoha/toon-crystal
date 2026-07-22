@@ -4,9 +4,8 @@ module Toon
   module Decoders
     struct KeyToken
       getter value : String
-      getter? quoted : Bool
 
-      def initialize(@value : String, @quoted : Bool)
+      def initialize(@value : String)
       end
     end
 
@@ -39,10 +38,6 @@ module Toon
 
       def key : String?
         @key_token.try(&.value)
-      end
-
-      def key_quoted? : Bool
-        @key_token.try(&.quoted?) || false
       end
     end
 
@@ -99,9 +94,9 @@ module Toon
         if !before.empty?
           return if find_unquoted_colon_index(before)
           if before.starts_with?(DOUBLE_QUOTE)
-            key_token = KeyToken.new(parse_string_literal(before), true)
+            key_token = KeyToken.new(parse_string_literal(before))
           else
-            key_token = KeyToken.new(before, false)
+            key_token = KeyToken.new(before)
           end
         end
 
