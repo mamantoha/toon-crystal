@@ -124,7 +124,8 @@ module Toon
     end
 
     def padded_with_whitespace?(value : String)
-      value != value.strip
+      value.starts_with?(' ') || value.starts_with?('\t') ||
+        value.ends_with?(' ') || value.ends_with?('\t')
     end
 
     # Key encoding
@@ -148,7 +149,7 @@ module Toon
       return false if key =~ /^\d+$/   # Numeric keys
       return false if key != key.strip # Leading/trailing spaces
 
-      key =~ /^[A-Z_][\w.]*$/i
+      key =~ /^[A-Z_][A-Z0-9_.]*$/i
     end
 
     # Value joining

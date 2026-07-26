@@ -89,7 +89,9 @@ module Toon
 
       # key can be quoted or unquoted up to '['
       if idx
-        before = rest[0, idx].strip
+        before_raw = rest[0, idx]
+        return if !before_raw.empty? && before_raw[-1].ascii_whitespace?
+        before = before_raw.strip
 
         if !before.empty?
           return if find_unquoted_colon_index(before)
@@ -180,6 +182,7 @@ module Toon
           inside_fields = header_seg[brace_idx + 1, close_brace - brace_idx - 1]
           # fields are key-encoded; split respecting quotes using active delimiter (fallback COMMA)
           delim_for_fields = delim || DEFAULT_DELIMITER.to_s
+          return if contains_inactive_delimiter?(inside_fields, delim_for_fields)
           fields = parse_field_nodes(inside_fields, delim_for_fields)
           return if fields.nil? || fields.empty?
         end
@@ -195,6 +198,24 @@ module Toon
 
     private def delimiter_char?(ch : Char) : Bool
       ch == COMMA || ch == TAB || ch == PIPE
+    end
+
+    private def contains_inactive_delimiter?(value : String, delimiter : String) : Bool
+      in_quotes = false
+      escaped = false
+
+      value.each_char do |ch|
+        if in_quotes
+          in_quotes = false if !escaped && ch == '"'
+          escaped = !escaped && ch == '\\'
+        elsif ch == '"'
+          in_quotes = true
+        elsif delimiter_char?(ch) && ch != delimiter[0]
+          return true
+        end
+      end
+
+      false
     end
 
     private def matching_brace_index(value : String, start : Int32) : Int32?

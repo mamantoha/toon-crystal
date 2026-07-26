@@ -13,6 +13,7 @@ module Toon
 
     # decode TOON string into Crystal JSON-like values
     def decode_value(input : String, indent : Int32 = 2, strict : Bool = true) : JsonValue
+      input = input.byte_slice(3, input.bytesize - 3) if input.starts_with?('\uFEFF')
       lines, blanks = tokenize_lines(input, indent, strict)
       cursor = LineCursor.new(lines, blanks)
       value = decode_value_from_lines(cursor, delimiter: DEFAULT_DELIMITER.to_s, strict: strict)
@@ -26,7 +27,7 @@ module Toon
 
       input.each_line.with_index do |raw, i|
         line_number = i + 1
-        raw = raw.chomp('\n').chomp('\r')
+        raw = raw.chomp('\n').chomp('\r').rstrip(' ')
 
         # Comments are removed lexically before blank-line and indentation
         # processing. Only U+0020 space may precede the marker.

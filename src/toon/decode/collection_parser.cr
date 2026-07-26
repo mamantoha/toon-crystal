@@ -29,7 +29,7 @@ module Toon
       start_line : Int32? = nil
       end_line : Int32? = nil
 
-      while !cursor.at_end? && items.size < header.length
+      while !cursor.at_end?
         line = cursor.peek
         break unless line && line.depth >= item_depth
 
@@ -38,19 +38,15 @@ module Toon
           items << decode_list_item(cursor, item_depth, delimiter, strict)
           end_line = cursor.current.try(&.line_number)
         else
+          if line.depth == item_depth && !key_value_line?(line.content)
+            raise DecodeError.new("Scalar line outside root primitive position")
+          end
           break
         end
       end
 
       assert_expected_count(items.size, header.length, "list array items") if strict
       validate_no_blank_lines!(cursor, start_line, end_line, "list array") if strict
-
-      if strict
-        line = cursor.peek
-        if line && line.depth == item_depth && line.content.starts_with?(LIST_ITEM_PREFIX)
-          raise DecodeError.new("Unexpected extra list array items")
-        end
-      end
 
       items
     end
@@ -64,11 +60,15 @@ module Toon
       start_line : Int32? = nil
       end_line : Int32? = nil
 
-      while !cursor.at_end? && objects.size < header.length
+      while !cursor.at_end?
         line = cursor.peek
         break unless line && line.depth >= row_depth
 
         if line.depth == row_depth
+          colon = find_unquoted_colon_index(line.content)
+          active_delimiter = find_unquoted_char_index(line.content, delimiter[0])
+          break if colon && (active_delimiter.nil? || colon < active_delimiter)
+
           start_line ||= line.line_number
           cursor.advance
           values = parse_delimited_values(line.content, delimiter)
@@ -85,15 +85,6 @@ module Toon
       assert_expected_count(objects.size, header.length, "tabular rows") if strict
       validate_no_blank_lines!(cursor, start_line, end_line, "tabular array") if strict
 
-      if strict
-        line = cursor.peek
-        if line && line.depth == row_depth
-          unless key_value_line?(line.content) || line.content.starts_with?(LIST_ITEM_PREFIX)
-            raise DecodeError.new("Unexpected extra tabular rows")
-          end
-        end
-      end
-
       objects
     end
 
@@ -107,13 +98,16 @@ module Toon
       end_line : Int32? = nil
       count = 0
 
-      while count < header.length
+      until cursor.at_end?
         line = cursor.peek
         break unless line && line.depth == row_depth
         start_line ||= line.line_number
         cursor.advance
         colon = find_unquoted_colon_index(line.content)
-        raise DecodeError.new("Invalid keyed entry row") unless colon
+        unless colon
+          raise DecodeError.new("Invalid keyed entry row") if strict
+          next
+        end
         key = parse_key_token_value(trim_token_spaces(line.content[0, colon]))
         cell_text = trim_token_spaces(line.content[colon + 1, line.content.size - colon - 1])
         raise DecodeError.new("Keyed entry row has no cells") if cell_text.empty?

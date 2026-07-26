@@ -9,6 +9,8 @@ module Toon
       header_part = content[0, colon_idx]
       bracket_idx = find_unquoted_char_index(header_part, '[')
       return unless bracket_idx
+      prefix = header_part[0, bracket_idx]
+      raise DecodeError.new("Invalid array header syntax") if !prefix.empty? && prefix[-1].ascii_whitespace?
 
       close_idx = header_part.index(']', bracket_idx + 1)
       return unless close_idx
@@ -23,6 +25,11 @@ module Toon
 
       if suffix.starts_with?('{') && suffix.ends_with?('}')
         validate_array_header_bracket_segment!(inside)
+        delimiter = array_header_delimiter(inside)
+        fields = suffix[1, suffix.size - 2]
+        if contains_inactive_delimiter?(fields, delimiter)
+          raise DecodeError.new("Invalid array header syntax")
+        end
         return
       end
 
@@ -45,6 +52,13 @@ module Toon
       unless length =~ /^(0|[1-9]\d*)$/
         raise DecodeError.new("Invalid array header syntax")
       end
+    end
+
+    private def array_header_delimiter(segment : String) : String
+      return PIPE.to_s if segment.ends_with?(PIPE)
+      return TAB.to_s if segment.ends_with?(TAB)
+
+      DEFAULT_DELIMITER.to_s
     end
 
     private def assert_expected_count(actual : Int32, expected : Int32, what : String)
