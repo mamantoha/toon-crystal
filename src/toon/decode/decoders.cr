@@ -56,7 +56,7 @@ module Toon
           end
         end
 
-        spaces_count = leading.gsub(/\t+/, "").size
+        spaces_count = leading.gsub(/\t/, " " * indent).size
         depth = (spaces_count // indent).to_i
         content = raw.byte_slice(leading_len)
         result << ParsedLine.new(depth, content, line_number)
