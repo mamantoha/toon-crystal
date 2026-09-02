@@ -8,7 +8,7 @@
 
 This is a Crystal reference implementation of the [TOON format specification](https://github.com/toon-format/spec).
 
-> **Note:** This implementation targets **TOON Format Specification Version** 4.1 (2026-07-26) and passes the official v4.1 fixture suite.
+> **Note:** This implementation targets **TOON Format Specification Version** 4.1 (2026-07-26) and passes the official v4.1.1 fixture suite.
 
 ## Installation
 
