@@ -79,6 +79,8 @@ module Toon
         return [] of JsonValue
       end
 
+      validate_malformed_array_header_strict!(first.content, strict)
+
       if parsed = parse_array_header_line(first.content)
         header, inline_values = parsed
 

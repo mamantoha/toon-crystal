@@ -6,6 +6,10 @@ module Toon
       colon_idx = find_unquoted_colon_index(content)
       return unless colon_idx
 
+      bracket_idx = find_unquoted_char_index(content, '[')
+      return unless bracket_idx && bracket_idx < colon_idx
+      raise DecodeError.new("Invalid array header syntax") unless parse_array_header_line(content)
+
       header_part = content[0, colon_idx]
       bracket_idx = find_unquoted_char_index(header_part, '[')
       return unless bracket_idx

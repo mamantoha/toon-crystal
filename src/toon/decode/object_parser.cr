@@ -93,11 +93,13 @@ module Toon
       return {} of String => JsonValue if after_hyphen.strip.empty?
       return [] of JsonValue if after_hyphen == "[]"
 
+      validate_malformed_array_header_strict!(after_hyphen, strict)
+
       if after_hyphen.lstrip.starts_with?('[')
         if parsed = parse_array_header_line(after_hyphen)
           header, inline_values = parsed
 
-          if strict && header.key.nil? && (header.keyed? || header.fields)
+          if header.key.nil? && (header.keyed? || header.fields)
             raise DecodeError.new("Keyless structured header cannot be a list item")
           end
 

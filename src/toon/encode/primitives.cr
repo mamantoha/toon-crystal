@@ -106,7 +106,7 @@ module Toon
       return false if padded_with_whitespace?(value)
       return false if value == TRUE_LITERAL || value == FALSE_LITERAL || value == NULL_LITERAL
       return false if numeric_like?(value)
-      return false if value.starts_with?('#') || value.starts_with?('\uFEFF')
+      return false if value.starts_with?('#')
       return false if value.includes?(COLON)
       return false if value.includes?(DOUBLE_QUOTE) || value.includes?('\\')
       return false if value =~ /[\[\]{}]/

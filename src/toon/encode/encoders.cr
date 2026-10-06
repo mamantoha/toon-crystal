@@ -18,6 +18,9 @@ module Toon
 
     # Encode normalized value
     def encode_value(value, options : EncodeOptions)
+      if value.is_a?(String) && value.starts_with?('\uFEFF')
+        return "#{DOUBLE_QUOTE}#{Primitives.escape_string(value)}#{DOUBLE_QUOTE}"
+      end
       if Normalizer.json_primitive?(value)
         return Primitives.encode_primitive(value, options.delimiter)
       end
@@ -297,21 +300,22 @@ module Toon
       header = Primitives.format_header(items.size, key: key, delimiter: options.delimiter)
       writer.push(depth, list_item ? "#{LIST_ITEM_PREFIX}#{header}" : header)
 
+      item_depth = depth + (list_item && key ? 2 : 1)
       items.each do |item|
         if Normalizer.json_primitive?(item)
           # Direct primitive as list item
-          writer.push(depth + 1, "#{LIST_ITEM_PREFIX}#{Primitives.encode_primitive(item, options.delimiter)}")
+          writer.push(item_depth, "#{LIST_ITEM_PREFIX}#{Primitives.encode_primitive(item, options.delimiter)}")
         elsif item.is_a?(Array)
           # Direct array as list item
           if Normalizer.array_of_primitives?(item)
             inline = format_inline_array(item, options.delimiter, nil)
-            writer.push(depth + 1, "#{LIST_ITEM_PREFIX}#{inline}")
+            writer.push(item_depth, "#{LIST_ITEM_PREFIX}#{inline}")
           else
-            encode_mixed_array_as_list_items(nil, item, writer, depth + 1, options, list_item: true)
+            encode_mixed_array_as_list_items(nil, item, writer, item_depth, options, list_item: true)
           end
         elsif item.is_a?(Hash)
           # Object as list item
-          encode_object_as_list_item(item, writer, depth + 1, options)
+          encode_object_as_list_item(item, writer, item_depth, options)
         end
       end
     end
@@ -363,31 +367,7 @@ module Toon
         if try_emit_compact_array_list_item(writer, depth, first_key, arr, options)
           # compact form emitted
         else
-          if Normalizer.array_of_objects?(arr)
-            # Fall back to list format for non-uniform arrays of objects
-            writer.push(depth, "#{LIST_ITEM_PREFIX}#{encoded_key}[#{arr.size}]:")
-
-            arr.each do |item|
-              if item.is_a?(Hash)
-                encode_object_as_list_item(item.as(Hash(String, JsonValue)), writer, depth + 2, options)
-              end
-            end
-          else
-            # Complex arrays on separate lines (array of arrays, etc.)
-            writer.push(depth, "#{LIST_ITEM_PREFIX}#{encoded_key}[#{arr.size}]:")
-
-            # Encode array contents at depth + 2 (header printed on hyphen line)
-            arr.each do |item|
-              if Normalizer.json_primitive?(item)
-                writer.push(depth + 2, "#{LIST_ITEM_PREFIX}#{Primitives.encode_primitive(item, options.delimiter)}")
-              elsif item.is_a?(Array) && Normalizer.array_of_primitives?(item)
-                inline = format_inline_array(item, options.delimiter, nil)
-                writer.push(depth + 2, "#{LIST_ITEM_PREFIX}#{inline}")
-              elsif item.is_a?(Hash)
-                encode_object_as_list_item(item.as(Hash(String, JsonValue)), writer, depth + 2, options)
-              end
-            end
-          end
+          encode_mixed_array_as_list_items(first_key, arr, writer, depth, options, list_item: true)
         end
       elsif first_value.is_a?(Hash)
         nested_keys = first_value.keys
