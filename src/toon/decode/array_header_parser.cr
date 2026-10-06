@@ -42,50 +42,10 @@ module Toon
     end
 
     private def parse_array_header_line(content : String) : {ArrayHeader, String?}?
-      # pattern: optional key, then [#?len<opt delim>]{<opt fields>}:<opt inline>
-      trimmed = content.lstrip
-
-      # Check if this is just a quoted string (not a quoted key with array header)
-      # A quoted key with array header would have '[' after the closing quote
-      if trimmed.starts_with?(DOUBLE_QUOTE)
-        # Find the closing quote
-        quote_end = trimmed.index(DOUBLE_QUOTE, 1)
-        if quote_end
-          # Check if there's a '[' after the quoted section
-          after_quote = trimmed[quote_end + 1, trimmed.size - quote_end - 1].lstrip
-          return unless after_quote.starts_with?('[')
-        else
-          # Unterminated quote, not an array header
-          return
-        end
-      end
-
+      # Optional key, then [length<keyed marker><delimiter>]{fields}:inline.
       key_token : KeyToken? = nil
       rest = content
-
-      # Find the first unquoted '[' (not inside quotes)
-      idx = nil
-      in_quotes = false
-      escaped = false
-      i = 0
-      while i < rest.size
-        ch = rest[i]
-        if in_quotes
-          if !escaped && ch == '"'
-            in_quotes = false
-          end
-          escaped = (!escaped && ch == '\\')
-        else
-          if ch == '['
-            idx = i
-            break
-          end
-          if ch == '"'
-            in_quotes = true
-          end
-        end
-        i += 1
-      end
+      idx = find_unquoted_char_index(rest, '[')
 
       # key can be quoted or unquoted up to '['
       if idx
@@ -105,7 +65,7 @@ module Toon
         rest = rest[idx, rest.size - idx]
       end
 
-      # [#?len<opt delim>]...
+      # [len<opt keyed marker><opt delim>]...
       return unless rest.starts_with?('[')
 
       # find closing bracket
@@ -114,22 +74,13 @@ module Toon
 
       return unless bracket_end
 
-      # Optional fields braces must appear immediately after optional whitespace
-      # following the closing bracket. Any other token means this is not an
-      # array header and should be treated as a normal key.
+      # Fields and the colon must immediately follow the bracket segment.
       cursor = bracket_end + 1
-      while cursor < rest.size && rest[cursor].ascii_whitespace?
-        cursor += 1
-      end
 
       if cursor < rest.size && rest[cursor] == '{'
         brace_end = matching_brace_index(rest, cursor)
         return unless brace_end
         cursor = brace_end + 1
-      end
-
-      while cursor < rest.size && rest[cursor].ascii_whitespace?
-        cursor += 1
       end
 
       return unless cursor < rest.size && rest[cursor] == ':'
@@ -167,7 +118,6 @@ module Toon
         end
       end
 
-      len_str = len_str.strip
       return unless len_str =~ /^(0|[1-9]\d*)$/
       # An unrepresentable count still denotes a header; strict count checks fail.
       length = len_str.to_i? || -1

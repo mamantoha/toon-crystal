@@ -131,12 +131,6 @@ module Toon
       value.all? { |item| json_primitive?(item) }
     end
 
-    def array_of_arrays?(value)
-      return false unless value.is_a?(Array)
-
-      value.all? { |item| json_array?(item) }
-    end
-
     def array_of_objects?(value)
       return false unless value.is_a?(Array)
 

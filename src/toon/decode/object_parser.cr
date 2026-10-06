@@ -20,11 +20,11 @@ module Toon
 
     private def decode_key_value_pair(line : ParsedLine, cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool) : {KeyToken, JsonValue}
       cursor.advance
-      key_token, value, _follow = decode_key_value(line.content, cursor, base_depth, delimiter, strict)
+      key_token, value = decode_key_value(line.content, cursor, base_depth, delimiter, strict)
       {key_token, value}
     end
 
-    private def decode_key_value(content : String, cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool) : {KeyToken, JsonValue, Int32}
+    private def decode_key_value(content : String, cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool) : {KeyToken, JsonValue}
       validate_malformed_array_header_strict!(content, strict)
 
       if parsed = parse_array_header_line(content)
@@ -32,30 +32,16 @@ module Toon
 
         if key_token = header.key_token
           value = decode_array_from_header(header, inline_values, cursor, base_depth, delimiter, strict)
-          return {key_token, value, base_depth + 1}
+          return {key_token, value}
         elsif strict
           raise DecodeError.new("Keyless array header in object field position")
-        end
-      end
-
-      if colon_idx = find_unquoted_colon_index(content)
-        header_candidate = content[0, colon_idx + 1]
-
-        if parsed = parse_array_header_line(header_candidate)
-          header, _ = parsed
-
-          if key_token = header.key_token
-            inline_values = content[colon_idx + 1, content.size - colon_idx - 1]
-            value = decode_array_from_header(header, inline_values, cursor, base_depth, delimiter, strict)
-            return {key_token, value, base_depth + 1}
-          end
         end
       end
 
       key_token, rest = parse_key_token(content)
       rest = trim_token_spaces(rest)
 
-      return {key_token, [] of JsonValue, base_depth + 1} if rest == "[]"
+      return {key_token, [] of JsonValue} if rest == "[]"
 
       if rest.empty?
         next_line = cursor.peek
@@ -67,13 +53,13 @@ module Toon
 
           nested_depth = next_line.depth
           nested = decode_object(cursor, nested_depth, delimiter, strict, base_depth)
-          return {key_token, nested, nested_depth}
+          return {key_token, nested}
         end
 
-        return {key_token, {} of String => JsonValue, base_depth + 1}
+        return {key_token, {} of String => JsonValue}
       end
 
-      {key_token, parse_primitive_token(rest), base_depth + 1}
+      {key_token, parse_primitive_token(rest)}
     end
 
     private def decode_list_item(cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool) : JsonValue
@@ -117,7 +103,7 @@ module Toon
 
     private def decode_object_from_list_item(first_line : ParsedLine, cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool) : Hash(String, JsonValue)
       after_hyphen = first_line.content.byte_slice(LIST_ITEM_PREFIX.size)
-      key_token, value, _follow = decode_key_value(after_hyphen, cursor, base_depth + 1, delimiter, strict)
+      key_token, value = decode_key_value(after_hyphen, cursor, base_depth + 1, delimiter, strict)
       object = {} of String => JsonValue
       insert_key!(object, key_token, value, strict)
       subsequent_depth = base_depth + 1

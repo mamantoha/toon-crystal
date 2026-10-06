@@ -90,20 +90,6 @@ module Toon
         end
       end
 
-      if colon_idx = find_unquoted_colon_index(first.content)
-        header_candidate = first.content[0, colon_idx + 1]
-
-        if parsed = parse_array_header_line(header_candidate)
-          header, _ = parsed
-
-          unless header.key
-            inline_values = first.content[colon_idx + 1, first.content.size - colon_idx - 1]
-            cursor.advance
-            return decode_array_from_header(header, inline_values, cursor, first.depth, delimiter, strict)
-          end
-        end
-      end
-
       if cursor.length == 1 && !key_value_line?(first.content)
         cursor.advance
         return parse_primitive_token(first.content)

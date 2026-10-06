@@ -95,17 +95,6 @@ module Toon
         return
       end
 
-      # Array of arrays (all primitives)
-      if Normalizer.array_of_arrays?(value)
-        all_primitive_arrays = value.all? { |arr| arr.is_a?(Array) && Normalizer.array_of_primitives?(arr) }
-
-        if all_primitive_arrays
-          encode_array_of_arrays_as_list_items(key, value, writer, depth, options)
-
-          return
-        end
-      end
-
       # Array of objects
       if Normalizer.array_of_objects?(value)
         header = detect_tabular_header(value)
@@ -127,19 +116,6 @@ module Toon
     def encode_inline_primitive_array(key : String?, values : Array, writer : LineWriter, depth : Int32, options : EncodeOptions)
       formatted = format_inline_array(values, options.delimiter, key)
       writer.push(depth, formatted)
-    end
-
-    # Array of arrays (expanded format)
-    def encode_array_of_arrays_as_list_items(key : String?, values : Array, writer : LineWriter, depth : Int32, options : EncodeOptions)
-      header = Primitives.format_header(values.size, key: key, delimiter: options.delimiter)
-      writer.push(depth, header)
-
-      values.each do |arr|
-        if arr.is_a?(Array) && Normalizer.array_of_primitives?(arr)
-          inline = format_inline_array(arr, options.delimiter, nil)
-          writer.push(depth + 1, "#{LIST_ITEM_PREFIX}#{inline}")
-        end
-      end
     end
 
     def format_inline_array(values, delimiter : String, key : String? = nil)
