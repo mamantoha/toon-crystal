@@ -1,17 +1,17 @@
 module Toon
   module Decoders
-    private def decode_object(cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool) : JsonValue
+    private def decode_object(cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool, parent_depth : Int32 = -1) : JsonValue
       object = {} of String => JsonValue
 
       until cursor.at_end?
         line = cursor.peek
-        break unless line && line.depth >= base_depth
+        break unless line && line.depth > parent_depth
 
         if line.depth == base_depth
           key_token, value = decode_key_value_pair(line, cursor, base_depth, delimiter, strict)
           insert_key!(object, key_token, value, strict)
         else
-          break
+          skip_orphan_line!(cursor, strict)
         end
       end
 
@@ -66,7 +66,7 @@ module Toon
           end
 
           nested_depth = next_line.depth
-          nested = decode_object(cursor, nested_depth, delimiter, strict)
+          nested = decode_object(cursor, nested_depth, delimiter, strict, base_depth)
           return {key_token, nested, nested_depth}
         end
 
@@ -83,7 +83,7 @@ module Toon
       if line.content == "-"
         next_line = cursor.peek
         if next_line && next_line.depth > base_depth
-          return decode_object(cursor, next_line.depth, delimiter, strict)
+          return decode_object(cursor, next_line.depth, delimiter, strict, base_depth)
         end
 
         return {} of String => JsonValue
@@ -122,14 +122,24 @@ module Toon
 
       until cursor.at_end?
         line = cursor.peek
-        break unless line && line.depth == subsequent_depth
-        break if line.content.starts_with?(LIST_ITEM_PREFIX)
+        break unless line && line.depth > base_depth
+        if line.depth != subsequent_depth
+          skip_orphan_line!(cursor, strict)
+          next
+        end
 
         key_token, value = decode_key_value_pair(line, cursor, subsequent_depth, delimiter, strict)
         insert_key!(object, key_token, value, strict)
       end
 
       object
+    end
+
+    private def skip_orphan_line!(cursor : LineCursor, strict : Bool)
+      return unless line = cursor.next
+      if strict || !key_value_line?(line.content)
+        raise DecodeError.new("Unexpected line outside its scope")
+      end
     end
 
     private def insert_key!(object : Hash(String, JsonValue), token : KeyToken, value : JsonValue, strict : Bool)
@@ -151,7 +161,7 @@ module Toon
           if ch == ':'
             key_raw = content[0, i]
             rest = content[i + 1, content.size - i - 1]
-            return {parse_key_token_value(key_raw.strip), rest}
+            return {parse_key_token_value(trim_token_spaces(key_raw)), rest}
           end
           in_quotes = true if ch == '"'
         end

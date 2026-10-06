@@ -78,7 +78,7 @@ module Toon
     end
 
     private def parse_string_literal(raw : String) : String
-      s = raw.strip
+      s = trim_token_spaces(raw)
 
       unless s.starts_with?(DOUBLE_QUOTE)
         return s

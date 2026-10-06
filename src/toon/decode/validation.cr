@@ -25,6 +25,7 @@ module Toon
 
       if suffix.starts_with?('{') && suffix.ends_with?('}')
         validate_array_header_bracket_segment!(inside)
+        raise DecodeError.new("Invalid field list") unless parse_array_header_line(content)
         delimiter = array_header_delimiter(inside)
         fields = suffix[1, suffix.size - 2]
         if contains_inactive_delimiter?(fields, delimiter)
@@ -49,7 +50,7 @@ module Toon
         end
       end
 
-      unless length =~ /^(0|[1-9]\d*)$/
+      unless length =~ /^(0|[1-9]\d*)$/ && length.to_i?
         raise DecodeError.new("Invalid array header syntax")
       end
     end

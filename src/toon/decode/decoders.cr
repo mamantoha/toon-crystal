@@ -17,7 +17,9 @@ module Toon
       lines, blanks = tokenize_lines(input, indent, strict)
       cursor = LineCursor.new(lines, blanks)
       value = decode_value_from_lines(cursor, delimiter: DEFAULT_DELIMITER.to_s, strict: strict)
-      raise DecodeError.new("Unexpected trailing content") if strict && !cursor.at_end?
+      while line = cursor.next
+        raise DecodeError.new("Unexpected trailing content") if strict || !key_value_line?(line.content)
+      end
       value
     end
 
@@ -25,15 +27,15 @@ module Toon
       result = [] of ParsedLine
       blank_lines = [] of Int32
 
-      input.each_line.with_index do |raw, i|
+      input.split('\n').each_with_index do |raw, i|
         line_number = i + 1
-        raw = raw.chomp('\n').chomp('\r').rstrip(' ')
+        raw = raw.chomp('\r').rstrip(' ')
 
         # Comments are removed lexically before blank-line and indentation
         # processing. Only U+0020 space may precede the marker.
         next if raw.lstrip(' ').starts_with?('#')
 
-        if raw.strip.empty?
+        if raw.empty? || (!strict && raw.strip.empty?)
           blank_lines << line_number
           next
         end
@@ -66,6 +68,9 @@ module Toon
     end
 
     private def decode_value_from_lines(cursor : LineCursor, delimiter : String, strict : Bool) : JsonValue
+      while (line = cursor.peek) && line.depth > 0
+        skip_orphan_line!(cursor, strict)
+      end
       first = cursor.peek
       return {} of String => JsonValue unless first
 

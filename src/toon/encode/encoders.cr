@@ -293,9 +293,9 @@ module Toon
     end
 
     # Array of objects (expanded format)
-    def encode_mixed_array_as_list_items(key : String?, items : Array, writer : LineWriter, depth : Int32, options : EncodeOptions)
+    def encode_mixed_array_as_list_items(key : String?, items : Array, writer : LineWriter, depth : Int32, options : EncodeOptions, list_item : Bool = false)
       header = Primitives.format_header(items.size, key: key, delimiter: options.delimiter)
-      writer.push(depth, header)
+      writer.push(depth, list_item ? "#{LIST_ITEM_PREFIX}#{header}" : header)
 
       items.each do |item|
         if Normalizer.json_primitive?(item)
@@ -306,17 +306,8 @@ module Toon
           if Normalizer.array_of_primitives?(item)
             inline = format_inline_array(item, options.delimiter, nil)
             writer.push(depth + 1, "#{LIST_ITEM_PREFIX}#{inline}")
-          elsif Normalizer.array_of_objects?(item)
-            # Array of objects as a nested list item: emit header then inner objects
-            header_str = Primitives.format_header(item.size, delimiter: options.delimiter)
-            writer.push(depth + 1, "#{LIST_ITEM_PREFIX}#{header_str}")
-
-            item.each do |sub|
-              if sub.is_a?(Hash)
-                # encode inner objects as list items, with increased depth
-                encode_object_as_list_item(sub.as(Hash(String, JsonValue)), writer, depth + 2, options)
-              end
-            end
+          else
+            encode_mixed_array_as_list_items(nil, item, writer, depth + 1, options, list_item: true)
           end
         elsif item.is_a?(Hash)
           # Object as list item

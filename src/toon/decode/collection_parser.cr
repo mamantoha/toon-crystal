@@ -12,7 +12,7 @@ module Toon
         raise DecodeError.new("Inline content after tabular header") if header.fields
         values = parse_delimited_values(inline_values, delimiter)
         primitives = values.map { |value| parse_primitive_token(value) }
-        assert_expected_count(primitives.size, header.length, "inline array items")
+        assert_expected_count(primitives.size, header.length, "inline array items") if strict
         return primitives.map(&.as(JsonValue))
       end
 
@@ -26,12 +26,15 @@ module Toon
     private def decode_list_array(header : ArrayHeader, cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool) : Array(JsonValue)
       items = [] of JsonValue
       item_depth = base_depth + 1
+      if !strict && (first = cursor.peek) && first.depth > base_depth
+        item_depth = first.depth
+      end
       start_line : Int32? = nil
       end_line : Int32? = nil
 
       while !cursor.at_end?
         line = cursor.peek
-        break unless line && line.depth >= item_depth
+        break unless line && line.depth > base_depth
 
         if line.depth == item_depth && (line.content.starts_with?(LIST_ITEM_PREFIX) || line.content == "-")
           start_line ||= line.line_number
@@ -41,7 +44,7 @@ module Toon
           if line.depth == item_depth && !key_value_line?(line.content)
             raise DecodeError.new("Scalar line outside root primitive position")
           end
-          break
+          skip_orphan_line!(cursor, strict)
         end
       end
 
@@ -54,6 +57,9 @@ module Toon
     private def decode_tabular_array(header : ArrayHeader, cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool) : Array(JsonValue)
       objects = [] of JsonValue
       row_depth = base_depth + 1
+      if !strict && (first = cursor.peek) && first.depth > base_depth
+        row_depth = first.depth
+      end
       fields = header.fields || [] of FieldNode
       validate_unique_fields!(fields) if strict
       leaf_count = fields.sum(&.leaf_count)
@@ -62,7 +68,7 @@ module Toon
 
       while !cursor.at_end?
         line = cursor.peek
-        break unless line && line.depth >= row_depth
+        break unless line && line.depth > base_depth
 
         if line.depth == row_depth
           colon = find_unquoted_colon_index(line.content)
@@ -72,13 +78,13 @@ module Toon
           start_line ||= line.line_number
           cursor.advance
           values = parse_delimited_values(line.content, delimiter)
-          assert_expected_count(values.size, leaf_count, "tabular row values")
+          assert_expected_count(values.size, leaf_count, "tabular row values") if strict
           object = {} of String => JsonValue
           assign_field_values!(object, fields, values.map { |value| parse_primitive_token(value) }, 0)
           objects << object.as(JsonValue)
           end_line = cursor.current.try(&.line_number)
         else
-          break
+          skip_orphan_line!(cursor, strict)
         end
       end
 
@@ -94,13 +100,20 @@ module Toon
       validate_unique_fields!(fields) if strict
       leaf_count = fields.sum(&.leaf_count)
       row_depth = base_depth + 1
+      if !strict && (first = cursor.peek) && first.depth > base_depth
+        row_depth = first.depth
+      end
       start_line : Int32? = nil
       end_line : Int32? = nil
       count = 0
 
       until cursor.at_end?
         line = cursor.peek
-        break unless line && line.depth == row_depth
+        break unless line && line.depth > base_depth
+        if line.depth != row_depth
+          skip_orphan_line!(cursor, strict)
+          next
+        end
         start_line ||= line.line_number
         cursor.advance
         colon = find_unquoted_colon_index(line.content)
@@ -145,7 +158,7 @@ module Toon
           index = assign_field_values!(child, children, values, index)
           object[field.name] = child
         else
-          object[field.name] = values[index]
+          object[field.name] = values[index] if index < values.size
           index += 1
         end
       end

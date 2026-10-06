@@ -47,17 +47,20 @@ module Toon
       # Spec requires no scientific notation (e.g., 1e-6 → 0.000001)
       s = n.to_s
 
-      if integer_like?(n) && n <= Int64::MAX
-        return n.to_i.to_s
+      return "0" if n == 0
+      if match = s.match(/^(-?)(\d+)(?:\.(\d+))?[eE]([+-]?\d+)$/)
+        sign = match[1]
+        digits = match[2] + (match[3]? || "")
+        point = match[2].size + match[4].to_i
+        if point <= 0
+          s = sign + "0." + "0" * -point + digits
+        elsif point >= digits.size
+          s = sign + digits + "0" * (point - digits.size)
+        else
+          s = sign + digits[0, point] + "." + digits[point..]
+        end
       end
-
-      # If string contains 'e' or 'E', convert to decimal form
-      if s.includes?('e') || s.includes?('E')
-        # Use fixed-point format with sufficient precision
-        # Format with up to 20 decimal places, then remove trailing zeros
-        formatted = sprintf("%.20f", n).gsub(/\.?0+$/, "")
-        return formatted
-      end
+      s = s.gsub(/\.?0+$/, "") if s.includes?('.')
 
       s
     end
@@ -103,7 +106,7 @@ module Toon
       return false if padded_with_whitespace?(value)
       return false if value == TRUE_LITERAL || value == FALSE_LITERAL || value == NULL_LITERAL
       return false if numeric_like?(value)
-      return false if value.starts_with?('#')
+      return false if value.starts_with?('#') || value.starts_with?('\uFEFF')
       return false if value.includes?(COLON)
       return false if value.includes?(DOUBLE_QUOTE) || value.includes?('\\')
       return false if value =~ /[\[\]{}]/

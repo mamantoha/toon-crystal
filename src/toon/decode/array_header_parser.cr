@@ -169,8 +169,8 @@ module Toon
 
       len_str = len_str.strip
       return unless len_str =~ /^(0|[1-9]\d*)$/
-      length = len_str.to_i?
-      return unless length
+      # An unrepresentable count still denotes a header; strict count checks fail.
+      length = len_str.to_i? || -1
 
       fields : Array(FieldNode)? = nil
       brace_idx = header_seg.index('{')
@@ -248,6 +248,7 @@ module Toon
         if brace = find_unquoted_char_index(token, '{')
           return unless token.ends_with?('}')
           name_token = token[0, brace]
+          return if name_token.empty? || name_token[-1].ascii_whitespace?
           children = parse_field_nodes(token[brace + 1, token.size - brace - 2], delimiter)
           return if children.nil? || children.empty?
           name = name_token.starts_with?(DOUBLE_QUOTE) ? parse_string_literal(name_token) : name_token
