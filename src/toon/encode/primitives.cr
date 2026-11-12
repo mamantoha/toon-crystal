@@ -48,7 +48,7 @@ module Toon
       s = n.to_s
 
       return "0" if n == 0
-      if match = s.match(/^(-?)(\d+)(?:\.(\d+))?[eE]([+-]?\d+)$/)
+      if match = s.match(/^(-?)([0-9]+)(?:\.([0-9]+))?[eE]([+-]?[0-9]+)$/)
         sign = match[1]
         digits = match[2] + (match[3]? || "")
         point = match[2].size + match[4].to_i
@@ -119,7 +119,7 @@ module Toon
 
     def numeric_like?(value : String)
       # Match numbers like: 42, -3.14, 1e-6, 05, etc.
-      value =~ /^[+-]?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i || value =~ /^[+-]?0\d+$/
+      value =~ /^[+-]?[0-9]+(?:\.[0-9]+)?(?:e[+-]?[0-9]+)?$/i || value =~ /^[+-]?0[0-9]+$/
     end
 
     def integer_like?(value : Float)
@@ -149,8 +149,8 @@ module Toon
       return false if key.includes?(COMMA)
       return false if key.starts_with?(LIST_ITEM_MARKER.to_s)
       return false if key.empty?
-      return false if key =~ /^\d+$/   # Numeric keys
-      return false if key != key.strip # Leading/trailing spaces
+      return false if key =~ /^[0-9]+$/ # Numeric keys
+      return false if key != key.strip  # Leading/trailing spaces
 
       key =~ /^[A-Z_][A-Z0-9_.]*$/i
     end

@@ -11,7 +11,7 @@ module Toon
           key_token, value = decode_key_value_pair(line, cursor, base_depth, delimiter, strict)
           insert_key!(object, key_token, value, strict)
         else
-          skip_orphan_line!(cursor, strict)
+          raise DecodeError.new("Unexpected line outside its scope")
         end
       end
 
@@ -25,7 +25,7 @@ module Toon
     end
 
     private def decode_key_value(content : String, cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool) : {KeyToken, JsonValue}
-      validate_malformed_array_header_strict!(content, strict)
+      validate_array_header!(content)
 
       if parsed = parse_array_header_line(content)
         header, inline_values = parsed
@@ -33,7 +33,7 @@ module Toon
         if key_token = header.key_token
           value = decode_array_from_header(header, inline_values, cursor, base_depth, delimiter, strict)
           return {key_token, value}
-        elsif strict
+        else
           raise DecodeError.new("Keyless array header in object field position")
         end
       end
@@ -66,22 +66,15 @@ module Toon
       line = cursor.next
       raise DecodeError.new("Expected list item") unless line
 
-      if line.content == "-"
-        next_line = cursor.peek
-        if next_line && next_line.depth > base_depth
-          return decode_object(cursor, next_line.depth, delimiter, strict, base_depth)
-        end
+      return {} of String => JsonValue if line.content == "-"
 
-        return {} of String => JsonValue
-      end
-
-      after_hyphen = line.content.byte_slice(LIST_ITEM_PREFIX.size)
-      return {} of String => JsonValue if after_hyphen.strip.empty?
+      after_hyphen = line.content.byte_slice(LIST_ITEM_PREFIX.size).lstrip(' ')
+      return {} of String => JsonValue if after_hyphen.empty?
       return [] of JsonValue if after_hyphen == "[]"
 
-      validate_malformed_array_header_strict!(after_hyphen, strict)
+      validate_array_header!(after_hyphen)
 
-      if after_hyphen.lstrip.starts_with?('[')
+      if after_hyphen.starts_with?('[')
         if parsed = parse_array_header_line(after_hyphen)
           header, inline_values = parsed
 
@@ -102,7 +95,7 @@ module Toon
     end
 
     private def decode_object_from_list_item(first_line : ParsedLine, cursor : LineCursor, base_depth : Int32, delimiter : String, strict : Bool) : Hash(String, JsonValue)
-      after_hyphen = first_line.content.byte_slice(LIST_ITEM_PREFIX.size)
+      after_hyphen = first_line.content.byte_slice(LIST_ITEM_PREFIX.size).lstrip(' ')
       key_token, value = decode_key_value(after_hyphen, cursor, base_depth + 1, delimiter, strict)
       object = {} of String => JsonValue
       insert_key!(object, key_token, value, strict)
@@ -112,8 +105,7 @@ module Toon
         line = cursor.peek
         break unless line && line.depth > base_depth
         if line.depth != subsequent_depth
-          skip_orphan_line!(cursor, strict)
-          next
+          raise DecodeError.new("Unexpected line outside its scope")
         end
 
         key_token, value = decode_key_value_pair(line, cursor, subsequent_depth, delimiter, strict)
@@ -121,13 +113,6 @@ module Toon
       end
 
       object
-    end
-
-    private def skip_orphan_line!(cursor : LineCursor, strict : Bool)
-      return unless line = cursor.next
-      if strict || !key_value_line?(line.content)
-        raise DecodeError.new("Unexpected line outside its scope")
-      end
     end
 
     private def insert_key!(object : Hash(String, JsonValue), token : KeyToken, value : JsonValue, strict : Bool)

@@ -50,8 +50,8 @@ module Toon
       # key can be quoted or unquoted up to '['
       if idx
         before_raw = rest[0, idx]
-        return if !before_raw.empty? && before_raw[-1].ascii_whitespace?
-        before = before_raw.strip
+        return if !before_raw.empty? && (before_raw[-1] == ' ' || before_raw[-1] == '\t')
+        before = before_raw
 
         if !before.empty?
           return if find_unquoted_colon_index(before)
@@ -118,7 +118,7 @@ module Toon
         end
       end
 
-      return unless len_str =~ /^(0|[1-9]\d*)$/
+      return unless len_str =~ /^(0|[1-9][0-9]*)$/
       # An unrepresentable count still denotes a header; strict count checks fail.
       length = len_str.to_i? || -1
 
@@ -198,7 +198,7 @@ module Toon
         if brace = find_unquoted_char_index(token, '{')
           return unless token.ends_with?('}')
           name_token = token[0, brace]
-          return if name_token.empty? || name_token[-1].ascii_whitespace?
+          return if name_token.empty? || (name_token[-1] == ' ' || name_token[-1] == '\t')
           children = parse_field_nodes(token[brace + 1, token.size - brace - 2], delimiter)
           return if children.nil? || children.empty?
           name = name_token.starts_with?(DOUBLE_QUOTE) ? parse_string_literal(name_token) : name_token

@@ -1,15 +1,13 @@
 module Toon
   module Decoders
-    private def validate_malformed_array_header_strict!(content : String, strict : Bool)
-      return unless strict
-
+    private def validate_array_header!(content : String)
       colon_idx = find_unquoted_colon_index(content)
       return unless colon_idx
 
       bracket_idx = find_unquoted_char_index(content, '[')
       return unless bracket_idx && bracket_idx < colon_idx
       parsed = parse_array_header_line(content)
-      unless parsed && parsed[0].length >= 0
+      unless parsed
         raise DecodeError.new("Invalid array header syntax")
       end
     end

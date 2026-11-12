@@ -56,8 +56,8 @@ module Toon
         return parse_string_literal(str)
       end
 
-      if str.match(/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/)
-        if str.match(/^-?(?:0|[1-9]\d*)$/)
+      if str.match(/^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$/)
+        if str.match(/^-?(?:0|[1-9][0-9]*)$/)
           return str.to_i64
         end
 

@@ -8,7 +8,7 @@ module Toon
         return decode_keyed_object(header, cursor, base_depth, delimiter, strict)
       end
 
-      if inline_values && !inline_values.strip.empty?
+      if inline_values
         raise DecodeError.new("Inline content after tabular header") if header.fields
         values = parse_delimited_values(inline_values, delimiter)
         primitives = values.map { |value| parse_primitive_token(value) }
@@ -44,7 +44,7 @@ module Toon
           if line.depth == item_depth && !key_value_line?(line.content)
             raise DecodeError.new("Scalar line outside root primitive position")
           end
-          skip_orphan_line!(cursor, strict)
+          raise DecodeError.new("Unexpected line outside its scope")
         end
       end
 
@@ -78,13 +78,13 @@ module Toon
           start_line ||= line.line_number
           cursor.advance
           values = parse_delimited_values(line.content, delimiter)
-          assert_expected_count(values.size, leaf_count, "tabular row values") if strict
+          assert_expected_count(values.size, leaf_count, "tabular row values")
           object = {} of String => JsonValue
           assign_field_values!(object, fields, values.map { |value| parse_primitive_token(value) }, 0)
           objects << object.as(JsonValue)
           end_line = cursor.current.try(&.line_number)
         else
-          skip_orphan_line!(cursor, strict)
+          raise DecodeError.new("Unexpected line outside its scope")
         end
       end
 
@@ -111,16 +111,12 @@ module Toon
         line = cursor.peek
         break unless line && line.depth > base_depth
         if line.depth != row_depth
-          skip_orphan_line!(cursor, strict)
-          next
+          raise DecodeError.new("Unexpected line outside its scope")
         end
         start_line ||= line.line_number
         cursor.advance
         colon = find_unquoted_colon_index(line.content)
-        unless colon
-          raise DecodeError.new("Invalid keyed entry row") if strict
-          next
-        end
+        raise DecodeError.new("Invalid keyed entry row") unless colon
         key = parse_key_token_value(trim_token_spaces(line.content[0, colon]))
         cell_text = trim_token_spaces(line.content[colon + 1, line.content.size - colon - 1])
         raise DecodeError.new("Keyed entry row has no cells") if cell_text.empty?
@@ -158,7 +154,7 @@ module Toon
           index = assign_field_values!(child, children, values, index)
           object[field.name] = child
         else
-          object[field.name] = values[index] if index < values.size
+          object[field.name] = values[index]
           index += 1
         end
       end
